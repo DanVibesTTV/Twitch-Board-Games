@@ -82,9 +82,10 @@ export class Die {
     return yaw.multiply(q);
   }
 
-  async roll(value, { ms = 900, from = new THREE.Vector3(-3, 0, 3) } = {}) {
+  // sound: false when several dice roll together and the caller plays one rattle for all of them.
+  async roll(value, { ms = 900, from = new THREE.Vector3(-3, 0, 3), sound = true } = {}) {
     this.show(true);
-    this.stage.sfx?.play('dice', { duration: ms }); // rattle is timed to the three bounces below
+    if (sound) this.stage.sfx?.play('dice', { duration: ms }); // rattle is timed to the three bounces below
     const target = this.#targetFor(value);
     const axis = new THREE.Vector3(Math.random() - 0.5, 0.4, Math.random() - 0.5).normalize();
     const spin = Math.PI * 2 * (2 + Math.random() * 1.5);

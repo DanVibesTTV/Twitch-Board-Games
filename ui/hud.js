@@ -269,11 +269,19 @@ export class Hud {
       <div class="prompt">${esc(d.prompt)}</div>
       ${this.#timerBar(payload.endsAt, payload.total)}
       <div class="hint">${hint}</div>
-      ${!showOptions || d.question ? '' : d.options.length >= 6
-        ? `<ol class="options grid">${d.options.map((o, i) => `
-        <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"><b>${this.p}${i + 1}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`
-        : `<ol class="options">${d.options.map((o, i) => `
-        <li class="${o.disabled ? 'disabled' : ''}"><b>${this.p}${o.alias && d.options.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`}`;
+      ${!showOptions || d.question ? '' : this.#optionList(d)}`;
+  }
+
+  // Hidden options (shortcuts) aren't listed; numbers stay their position in the full list.
+  // 6+ options become a compact number grid unless the game asks for a list (decision.layout = 'list').
+  #optionList(d) {
+    const shown = d.options.map((o, i) => ({ o, i })).filter(({ o }) => !o.hidden);
+    if (shown.length >= 6 && d.layout !== 'list') {
+      return `<ol class="options grid">${shown.map(({ o, i }) => `
+        <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"><b>${this.p}${i + 1}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
+    }
+    return `<ol class="options">${shown.map(({ o, i }) => `
+        <li class="${o.disabled ? 'disabled' : ''}"><b>${this.p}${o.alias && shown.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
   }
 
   // Big question card over the board. Answers: !1…!n; the result is revealed via game events.

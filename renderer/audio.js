@@ -136,7 +136,7 @@ function dieHit(ctx, out, noise, t, strength) {
 }
 
 // Balances the synths against each other (measured peaks), so they sit at similar loudness.
-export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6, correct: 2.1, wrong: 1.6, wedge: 3.6 };
+export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6, correct: 2.1, wrong: 1.6, wedge: 3.6, jazz: 2.6 };
 
 export const SYNTHS = {
   // Rattle that follows the 3D die: a big hit at each of the three bounces,
@@ -323,6 +323,23 @@ SYNTHS.win = (ctx, out, noise, t, { gain = 1 } = {}) => {
     tone(ctx, out, t + i * 0.09, { from: f, to: f, dur: i === 4 ? 0.6 : 0.16, gain: 0.18 * gain, type: 'square' });
     tone(ctx, out, t + i * 0.09, { from: f * 2, to: f * 2, dur: i === 4 ? 0.5 : 0.12, gain: 0.06 * gain, type: 'sine' });
   });
+};
+
+// Jazzy Dice: a soft electric-piano chord (maj9), arpeggiated. opts.big adds a rising run on top
+// (five alike), opts.pitch transposes.
+SYNTHS.jazz = (ctx, out, noise, t, { gain = 1, big = false, pitch = 1 } = {}) => {
+  const chord = [261.63, 329.63, 392.0, 493.88, 587.33].map((f) => f * pitch);
+  chord.forEach((f, i) => {
+    const at = t + i * 0.045;
+    tone(ctx, out, at, { from: f, to: f * 0.998, dur: 1.1, gain: 0.11 * gain, type: 'sine' });
+    tone(ctx, out, at, { from: f * 2, to: f * 2, dur: 0.35, gain: 0.025 * gain, type: 'triangle' }); // tine
+  });
+  tone(ctx, out, t, { from: 130.81 * pitch, to: 130.5 * pitch, dur: 0.9, gain: 0.12 * gain, type: 'triangle' }); // bass note
+  if (big) {
+    [783.99, 880, 987.77, 1174.66, 1318.51, 1567.98].forEach((f, i) => {
+      tone(ctx, out, t + 0.3 + i * 0.07, { from: f * pitch, to: f * pitch, dur: i === 5 ? 0.7 : 0.18, gain: 0.07 * gain, type: 'triangle' });
+    });
+  }
 };
 
 function softClip(amount) {
