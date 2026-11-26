@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Board Games Overlay</title>
+  <link rel="stylesheet" href="ui/hud.css">
+  <!-- Three.js from a CDN, pinned. To run fully offline, download these two
+       paths into vendor/ and point the import map there. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="stage"></div>
+  <div id="hud"></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>

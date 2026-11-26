@@ -1,0 +1,28 @@
+{
+  "id": "ludo",
+  "name": "Ludo",
+  "tagline": "Roll a 6, race your pawns home, knock rivals back to start.",
+  "version": "0.1.0",
+  "coreVersion": "1.0.0",
+  "players": { "min": 2, "max": 4 },
+  "durationMinutes": [15, 30],
+  "needs": [],
+  "thumbnail": "thumbnail.svg",
+  "seats": [
+    { "id": "red", "name": "Red", "color": "#e5484d" },
+    { "id": "green", "name": "Green", "color": "#2f9e64" },
+    { "id": "yellow", "name": "Yellow", "color": "#f0b400" },
+    { "id": "blue", "name": "Blue", "color": "#3b74e8" }
+  ],
+  "commands": [
+    { "cmd": "!roll", "help": "roll the die on your turn" },
+    { "cmd": "!1 … !4", "help": "move the pawn with that number" }
+  ],
+  "defaultRules": {
+    "sixExtraTurn": true,
+    "tripleSixForfeit": true,
+    "threeTriesWhenStuck": true,
+    "safeSquares": true,
+    "captureBonus": false
+  }
+}
