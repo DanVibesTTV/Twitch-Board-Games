@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.4)
+# Twitch Board Games (v0.5)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -43,7 +43,7 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
-Options: `game=ludo`, `game=tubes` or `game=four` (skip the browser), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`.
+Options: `game=ludo`, `game=tubes` or `game=four` (skip the browser), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
 
 **Sound:** tick **"Control audio via OBS"** on the browser source so the game shows up in the audio mixer. All sounds are synthesized in code: a classic set (dice rattle, wooden steps, punch, whoosh) and a futuristic set (zaps, teleport, tube slide, win jingle). To use your own recordings, see `sounds/README.md`. In a normal browser, click the page once to enable audio.
 
@@ -54,10 +54,19 @@ Options: `game=ludo`, `game=tubes` or `game=four` (skip the browser), `turn=30`,
 | everyone | `!join [color]`, `!leave` | take or leave a seat in the lobby |
 | player | `!roll`, `!1` … `!9` | act on your turn (the bot plays for you on timeout, and takes over after 3 timeouts) |
 | crowd | `!1` … | vote for a chat-controlled seat |
+| everyone | `!bgstats`, `!bgstats me`, `!bgstats <game>` | next leaderboard page on the game select screen; your own stats in chat; jump to a game's board |
 | everyone (draw modes) | `!join` | enter the draw; players are picked at random when the lobby closes |
-| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]`, `!bg mode <mode>`, `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
+| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]`, `!bg mode <mode>`, `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
 
 When at least 2 humans play and the connection supports it (Lumia, Streamer.bot), a **Twitch prediction** with every seat as an outcome opens at game start. It resolves for the winner, or is refunded if the game is stopped or ends in a draw. A chat-vote seat counts as a player, so *Chat vs Streamer* gets a prediction too.
+
+## Viewer stats
+The game select screen shows a leaderboard. `!bgstats` turns the page: **most wins across all games**, then **longest winning streak**, then **most wins per game** (a game's page appears once it has results). `!bgstats me` posts your own numbers in chat: wins, games played, best streak, current streak and best game.
+
+- Only human players count; bots and chat-vote seats are never credited.
+- Everyone seated at the start has played, even if they leave or go AFK. Leaving can't protect a streak, and a bot playing for you can't win for you.
+- A win adds to your streak, a loss resets it, and a draw leaves it unchanged. Games stopped with `!bg stop` aren't recorded.
+- Stats are saved in the browser source's own storage (localStorage). They survive OBS restarts, but they belong to that one URL in that one browser: the hosted page and `127.0.0.1` keep separate stats, and clearing the browser source's cache can delete them. Turn stats off with `&stats=0`; mods reset them with `!bg stats reset confirm` (or `!bg stats reset four confirm` for one game).
 
 ## What each connection can do
 

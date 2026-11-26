@@ -23,7 +23,8 @@ export class Hud {
     this.main = el('section', 'card hud-main');
     this.seatsBox = el('section', 'card hud-seats');
     this.logBox = el('section', 'card hud-log');
-    this.side.append(this.header, this.seatsBox, this.main, this.logBox);
+    this.statsBox = el('section', 'card hud-stats');
+    this.side.append(this.header, this.seatsBox, this.main, this.logBox, this.statsBox);
     this.menu = el('section', 'hud-menu');
     this.toasts = el('div', 'hud-toasts');
     this.banner = el('div', 'hud-banner');
@@ -44,6 +45,7 @@ export class Hud {
     session.on('toast', (t) => this.#toast(t));
     session.on('gameVote', (v) => this.#renderMenu(v));
     session.on('gameOver', (o) => this.#gameOver(o));
+    session.on('stats', (v) => this.#renderStats(v));
     bridge.on('status', (st) => { this.status = st; this.#renderHeader(); });
 
     this.#phase(session.phase);
@@ -55,6 +57,7 @@ export class Hud {
     this.#renderHeader();
     if (phase === 'menu') {
       this.#renderMenu(null);
+      this.#renderStats(this.s.statsView());
       this.logLines = [];
       this.#renderLog();
     }
@@ -94,6 +97,27 @@ export class Hud {
       grid.append(card);
     });
     this.menu.append(head, grid);
+  }
+
+  // Leaderboard on the game select screen; !bgstats turns the page.
+  #renderStats(view) {
+    if (!view) { this.statsBox.style.display = 'none'; return; }
+    this.statsBox.style.display = '';
+    const { pages, index } = view;
+    const page = pages[index] ?? pages[0];
+    const medals = ['🥇', '🥈', '🥉'];
+    const rows = page.rows.length
+      ? page.rows.map((r, i) => `
+        <li><span class="rank">${medals[i] ?? i + 1}</span><span class="name">${esc(r.name)}</span>
+          <span class="value">${r.value}<small> ${esc(page.unit)}</small></span><span class="detail">${esc(r.detail)}</span></li>`).join('')
+      : '<li class="empty">No results yet. Win a game to get on the board!</li>';
+    this.statsBox.innerHTML = `
+      <div class="stats-head">
+        <div class="stats-title">${esc(page.title)}</div>
+        <div class="dots">${pages.map((_, i) => `<i class="${i === index ? 'on' : ''}"></i>`).join('')}</div>
+      </div>
+      <ol class="board" key="${esc(page.id)}">${rows}</ol>
+      <div class="stats-hint"><b>${this.p}bgstats</b> next page · <b>${this.p}bgstats me</b> your stats</div>`;
   }
 
   #renderSeats() {

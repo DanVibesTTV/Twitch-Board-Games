@@ -8,6 +8,7 @@
 //   !roll / !r          → { kind: 'alias', alias: 'roll' } (any alias a game defines)
 //   !join [seat]        → { kind: 'join', arg }
 //   !leave              → { kind: 'leave' }
+//   !bgstats [me|page]  → { kind: 'stats', arg }         (everyone)
 //   !bg <sub> [arg]     → { kind: 'admin', sub, arg }   (mods/broadcaster only)
 
 const ALIASES = { r: 'roll' };
@@ -23,6 +24,7 @@ export function parseCommand(msg, prefix = '!') {
   if (/^\d{1,2}$/.test(word)) return { kind: 'choose', index: Number(word) };
   if (word === 'join' || word === 'play') return { kind: 'join', arg: arg?.toLowerCase() ?? null };
   if (word === 'leave' || word === 'quit') return { kind: 'leave' };
+  if (word === 'bgstats') return { kind: 'stats', arg: arg?.toLowerCase() ?? null };
   if (word === 'bg') {
     if (!(msg.user?.isMod || msg.user?.isBroadcaster)) return null;
     const [sub, ...subArgs] = (arg ?? '').split(/\s+/);

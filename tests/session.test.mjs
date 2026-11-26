@@ -276,3 +276,68 @@ test('a draw refunds the prediction', async () => {
   assert.ok(bridge.calls.some((c) => c[0] === 'cancel'), 'prediction cancelled on draw');
   assert.ok(!bridge.calls.some((c) => c[0] === 'resolve'));
 });
+
+// ── viewer stats ──
+test('finished games are recorded; leavers count as played; !bgstats pages and "me"', async () => {
+  const { StatsStore } = await import('../core/stats.js');
+  const mem = new Map();
+  const stats = new StatsStore({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) });
+  const man = JSON.parse(readFileSync(new URL('../games/four/manifest.json', import.meta.url)));
+  const four = await import('../games/four/logic.js');
+  const bridge = new DevBridge();
+  const said = [];
+  bridge.sendChat = async (t) => said.push(t);
+  const registry = createRegistry([{ ...man, needs: [] }], async () => four);
+  const sched = fakeScheduler();
+  const s = new Session({ bridge, registry, scheduler: sched, stats, config: { afterGame: 'menu', afkLimit: 1, predictions: false, statsCooldownMs: 0 } });
+  const views = [];
+  s.on('stats', (v) => views.push(v));
+
+  bridge.inject('!bg play four duel');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('a: !join'); bridge.inject('b: !join');
+  bridge.inject('!bg start');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('a: !leave'); // a leaves mid-game → bot plays for a, but a still "played"
+  await sched.runAll();
+
+  const P = stats.data.players;
+  assert.equal(P.a.played, 1);
+  assert.equal(P.b.played, 1);
+  assert.equal(P.a.wins, 0, 'a left: a bot playing for a cannot win for a');
+  assert.ok(views.length >= 1, 'HUD notified');
+  assert.equal(s.phase, 'menu');
+
+  // paging on the game select screen
+  const before = s.statsIndex;
+  bridge.inject('viewer: !bgstats');
+  assert.equal(s.statsIndex, (before + 1) % s.statsView().pages.length);
+  bridge.inject('viewer: !bgstats overall');
+  assert.equal(s.statsIndex, 0);
+  bridge.inject('b: !bgstats me');
+  assert.ok(said.some((t) => t.startsWith('b: ')));
+  bridge.inject('nobody: !bgstats me');
+  assert.ok(said.some((t) => t.includes('no finished games yet')));
+
+  // reset needs confirm
+  bridge.inject('!bg stats reset');
+  assert.equal(P.b.played, 1);
+  bridge.inject('!bg stats reset confirm');
+  assert.deepEqual(stats.data.players, {});
+});
+
+test('stopped games are not recorded', async () => {
+  const { StatsStore } = await import('../core/stats.js');
+  const mem = new Map();
+  const stats = new StatsStore({ getItem: (k) => mem.get(k) ?? null, setItem: (k, v) => mem.set(k, v) });
+  const man = JSON.parse(readFileSync(new URL('../games/four/manifest.json', import.meta.url)));
+  const four = await import('../games/four/logic.js');
+  const bridge = new DevBridge();
+  const s = new Session({ bridge, registry: createRegistry([{ ...man, needs: [] }], async () => four), scheduler: fakeScheduler(), stats, config: { predictions: false } });
+  bridge.inject('!bg play four duel');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('a: !join'); bridge.inject('b: !join'); bridge.inject('!bg start');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('!bg stop');
+  assert.deepEqual(stats.data.players, {});
+});
