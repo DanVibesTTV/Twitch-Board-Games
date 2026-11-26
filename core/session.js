@@ -24,8 +24,8 @@ export const DEFAULT_CONFIG = {
   minHumans: 1,
   predictions: true,
   predictionSeconds: 60,
-  overSeconds: 15,         // winner screen, then rematch lobby
-  afterGame: 'lobby',      // 'lobby' (rematch) or 'menu'
+  overSeconds: 15,         // how long the winner screen shows before moving on
+  afterGame: 'menu',       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
 };
 
 export class Session extends Emitter {
@@ -86,7 +86,8 @@ export class Session extends Emitter {
     if (sub === 'stop') return this.stop();
     if (sub === 'crowd' && this.phase === 'lobby') return this.setCrowdSeat(arg);
     if (sub === 'bot' && this.phase === 'lobby') return this.setBotSeat(arg);
-    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg menu`);
+    if (sub === 'bots' && this.phase === 'lobby') return this.setBotFill(arg);
+    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg menu`);
   }
 
   say(text) {
@@ -136,6 +137,8 @@ export class Session extends Emitter {
     this.manifest = manifest;
     this.module = await this.registry.load(gameId);
     this.seats = manifest.seats.map((s) => ({ ...s, occupant: null }));
+    // Bots fill empty seats until this many seats are taken (games with many seats default lower).
+    this.botFillTo = this.config.fillBots ? (manifest.players.botFillTo ?? manifest.players.max) : 0;
     this.phase = 'lobby';
     this.lobbyEndsAt = null;
     this.emit('phase', this.phase);
@@ -179,6 +182,15 @@ export class Session extends Emitter {
     this.#lobbyCountdown();
   }
 
+  // "!bg bots 6" → bots fill up to 6 seats in total; "!bg bots 0" → no bots.
+  setBotFill(arg) {
+    const n = Number.parseInt(arg, 10);
+    if (Number.isNaN(n)) return this.say(`Bots fill up to ${this.botFillTo} seats. Change with ${this.config.prefix}bg bots <number>.`);
+    this.botFillTo = Math.max(0, Math.min(n, this.manifest.players.max));
+    this.say(this.botFillTo ? `Bots will fill up to ${this.botFillTo} seats.` : 'No bots this game.');
+    this.#emitSeats();
+  }
+
   setBotSeat(arg) {
     const seat = this.seats.find((s) => s.id === arg) ?? this.seats.find((s) => !s.occupant);
     if (!seat) return;
@@ -209,8 +221,10 @@ export class Session extends Emitter {
       this.lobbyEndsAt = null;
       return this.say(`Need at least ${this.config.minHumans} player(s) — type ${this.config.prefix}join!`);
     }
-    if (this.config.fillBots) {
-      for (const s of this.seats) s.occupant ??= { type: 'bot' };
+    let taken = this.seats.filter((s) => s.occupant).length;
+    for (const s of this.seats) {
+      if (taken >= Math.max(this.botFillTo, this.manifest.players.min)) break;
+      if (!s.occupant && (this.botFillTo > 0 || taken < this.manifest.players.min)) { s.occupant = { type: 'bot' }; taken++; }
     }
     let active = this.seats.filter((s) => s.occupant);
     if (active.length < this.manifest.players.min) {

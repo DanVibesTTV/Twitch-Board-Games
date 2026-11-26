@@ -4,7 +4,7 @@
 //   index.html?bridge=lumia&token=XXXX                 → Lumia Stream
 //   index.html?bridge=streamerbot&port=8080            → Streamer.bot
 // Optional: game=ludo (skip the browser), turn=30, lobby=45, vote=15, bots=0,
-//           predictions=0, prefix=!, after=menu, preview=1 (dark background), fps=60,
+//           predictions=0, prefix=!, after=lobby (rematch instead of game select), preview=1 (dark background), fps=60,
 //           volume=0.8 (0–1), mute=1
 
 import { createBridge } from './bridges/index.js';
@@ -42,7 +42,7 @@ async function main() {
     voteSeconds: num('vote', 15),
     fillBots: bool('bots', true),
     predictions: bool('predictions', true),
-    afterGame: q.get('after') ?? 'lobby',
+    afterGame: q.get('after') ?? 'menu',
   };
   const session = new Session({ bridge, registry, view: createView(stage), config });
   new Hud(document.getElementById('hud'), { session, bridge, registry, prefix: config.prefix });

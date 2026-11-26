@@ -22,21 +22,23 @@ function panelMaterials(boardTex, backMat, edgeMat, offsetU, offsetV) {
   return [edgeMat, edgeMat, top, backMat, edgeMat, edgeMat];
 }
 
-export function buildBoardMesh(boardTex, backTex, size, thickness) {
+export function buildBoardMesh(boardTex, backTex, size, thickness, depth = size) {
   const edge = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.8 });
   const back = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9 });
   const top = new THREE.MeshStandardMaterial({ map: boardTex, roughness: 0.75 });
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, thickness, size), [edge, edge, top, back, edge, edge]);
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, thickness, depth), [edge, edge, top, back, edge, edge]);
   mesh.position.y = thickness / 2;
   return mesh;
 }
 
-export async function unfoldBoard(stage, { boardTex, backTex, size = 10, thickness = 0.16, speed = 1 }) {
+// `size` is the width (X); pass `depth` (Z) for a non-square board.
+export async function unfoldBoard(stage, { boardTex, backTex, size = 10, depth = size, thickness = 0.16, speed = 1, edgeColor = 0x6b4a2c }) {
   const t = thickness;
   const q = size / 2;
-  const edge = new THREE.MeshStandardMaterial({ color: 0x6b4a2c, roughness: 0.8 });
+  const qz = depth / 2;
+  const edge = new THREE.MeshStandardMaterial({ color: edgeColor, roughness: 0.8 });
   const back = new THREE.MeshStandardMaterial({ map: backTex, roughness: 0.9 });
-  const geo = new THREE.BoxGeometry(q, t, q);
+  const geo = new THREE.BoxGeometry(q, t, qz);
 
   const panel = (u, v) => new THREE.Mesh(geo, panelMaterials(boardTex, back, edge, u, v));
   const TL = panel(0, 0.5);
@@ -47,23 +49,23 @@ export async function unfoldBoard(stage, { boardTex, backTex, size = 10, thickne
   const root = new THREE.Group();
   const leftHalf = new THREE.Group();
   root.add(leftHalf);
-  TL.position.set(-q / 2, t / 2, -q / 2);
+  TL.position.set(-q / 2, t / 2, -qz / 2);
   leftHalf.add(TL);
 
   const blPivot = new THREE.Group();
   blPivot.position.set(0, t, 0);
-  BL.position.set(-q / 2, -t / 2, q / 2);
+  BL.position.set(-q / 2, -t / 2, qz / 2);
   blPivot.add(BL);
   leftHalf.add(blPivot);
 
   const rightHalf = new THREE.Group();
   rightHalf.position.set(0, 2 * t, 0);
   root.add(rightHalf);
-  TR.position.set(q / 2, -2 * t + t / 2, -q / 2);
+  TR.position.set(q / 2, -2 * t + t / 2, -qz / 2);
   rightHalf.add(TR);
   const brPivot = new THREE.Group();
   brPivot.position.set(0, -t, 0);
-  BR.position.set(q / 2, -t / 2, q / 2);
+  BR.position.set(q / 2, -t / 2, qz / 2);
   brPivot.add(BR);
   rightHalf.add(brPivot);
 
@@ -91,7 +93,11 @@ export async function unfoldBoard(stage, { boardTex, backTex, size = 10, thickne
   // 4. swap for a single static mesh (1 draw call less ×4, no seams)
   stage.scene.remove(root);
   geo.dispose();
-  const board = buildBoardMesh(boardTex, backTex, size, thickness);
+  const board = buildBoardMesh(boardTex, backTex, size, thickness, depth);
+  board.material[0].color.set(edgeColor);
+  board.material[1] = board.material[0];
+  board.material[4] = board.material[0];
+  board.material[5] = board.material[0];
   stage.scene.add(board);
   stage.invalidate();
   return board;

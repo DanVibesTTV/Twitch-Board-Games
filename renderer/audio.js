@@ -136,7 +136,7 @@ function dieHit(ctx, out, noise, t, strength) {
 }
 
 // Balances the synths against each other (measured peaks), so they sit at similar loudness.
-export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5 };
+export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8 };
 
 export const SYNTHS = {
   // Rattle that follows the 3D die: a big hit at each of the three bounces,
@@ -200,6 +200,93 @@ export const SYNTHS = {
     src.start(t);
     src.stop(t + T + 0.05);
   },
+};
+
+// ── futuristic set (Tubes & Teleporters, and any sci-fi game) ──
+
+// Synth blip for a step. opts.pitch shifts it (renderer rises along a move).
+SYNTHS.zap = (ctx, out, noise, t, { pitch = 1, gain = 1 } = {}) => {
+  const p = pitch * rand(0.98, 1.02);
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.setValueAtTime(5000, t);
+  f.frequency.exponentialRampToValueAtTime(900, t + 0.08);
+  f.connect(out);
+  tone(ctx, f, t, { from: 1400 * p, to: 700 * p, dur: 0.07, gain: 0.25 * gain, type: 'square' });
+  tone(ctx, f, t + 0.012, { from: 2100 * p, to: 1500 * p, dur: 0.05, gain: 0.12 * gain, type: 'sawtooth' });
+  burst(ctx, out, noise, t, { dur: 0.012, freq: 6000, q: 2, gain: 0.12 * gain });
+};
+
+// Beam-up: shimmering rising sweep with a sparkle arpeggio, then an arrival ping.
+SYNTHS.teleport = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  const T = 0.84;
+  const o = ctx.createOscillator();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(180, t);
+  o.frequency.exponentialRampToValueAtTime(1600, t + T * 0.5);
+  o.frequency.exponentialRampToValueAtTime(400, t + T);
+  const lfo = ctx.createOscillator();
+  lfo.frequency.value = 22;
+  const lfoGain = ctx.createGain();
+  lfoGain.gain.value = 60;
+  lfo.connect(lfoGain).connect(o.frequency);
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass';
+  f.Q.value = 3;
+  f.frequency.setValueAtTime(600, t);
+  f.frequency.exponentialRampToValueAtTime(3500, t + T * 0.5);
+  f.frequency.exponentialRampToValueAtTime(900, t + T);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.3 * gain, t + 0.08);
+  g.gain.setValueAtTime(0.3 * gain, t + T * 0.45);
+  g.gain.exponentialRampToValueAtTime(0.02 * gain, t + T * 0.5);
+  g.gain.exponentialRampToValueAtTime(0.25 * gain, t + T * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + T);
+  o.connect(f).connect(g).connect(out);
+  o.start(t); lfo.start(t);
+  o.stop(t + T + 0.05); lfo.stop(t + T + 0.05);
+  [0, 4, 7, 12, 16, 19].forEach((semi, i) => {
+    tone(ctx, out, t + 0.05 + i * 0.055, { from: 880 * 2 ** (semi / 12), to: 880 * 2 ** (semi / 12) * 0.98, dur: 0.12, gain: 0.08 * gain, type: 'triangle' });
+  });
+  tone(ctx, out, t + T * 0.55, { from: 2637, to: 2600, dur: 0.35, gain: 0.12 * gain, type: 'sine' });
+};
+
+// Getting sucked down a tube: wobbly falling sweep (the tube's ribs) over filtered air.
+SYNTHS.slide = (ctx, out, noise, t, { duration = 1000, gain = 1 } = {}) => {
+  const T = duration / 1000;
+  const o = ctx.createOscillator();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(1300, t);
+  o.frequency.exponentialRampToValueAtTime(110, t + T);
+  const lfo = ctx.createOscillator();
+  lfo.type = 'sine';
+  lfo.frequency.setValueAtTime(9, t);
+  lfo.frequency.linearRampToValueAtTime(16, t + T);
+  const depth = ctx.createGain();
+  depth.gain.value = 0.5;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.28 * gain, t + 0.06);
+  g.gain.setValueAtTime(0.28 * gain, t + T * 0.8);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + T);
+  // tremolo: LFO modulates the gain around its envelope
+  const trem = ctx.createGain();
+  trem.gain.value = 0.6;
+  lfo.connect(depth).connect(trem.gain);
+  o.connect(trem).connect(g).connect(out);
+  o.start(t); lfo.start(t);
+  o.stop(t + T + 0.05); lfo.stop(t + T + 0.05);
+  SYNTHS.whoosh(ctx, out, noise, t, { duration, gain: 0.7 * gain });
+  tone(ctx, out, t + T - 0.02, { from: 220, to: 70, dur: 0.18, gain: 0.35 * gain, type: 'sine' }); // pop out
+};
+
+// Short victory arpeggio.
+SYNTHS.win = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  [523.25, 659.25, 783.99, 1046.5, 1318.5].forEach((f, i) => {
+    tone(ctx, out, t + i * 0.09, { from: f, to: f, dur: i === 4 ? 0.6 : 0.16, gain: 0.18 * gain, type: 'square' });
+    tone(ctx, out, t + i * 0.09, { from: f * 2, to: f * 2, dur: i === 4 ? 0.5 : 0.12, gain: 0.06 * gain, type: 'sine' });
+  });
 };
 
 function softClip(amount) {

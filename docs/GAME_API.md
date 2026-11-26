@@ -19,7 +19,7 @@ games/
 |---|---|
 | `id`, `name`, `tagline`, `version` | shown in the game browser |
 | `coreVersion` | core version the game targets; a different major version means the game is skipped |
-| `players` | `{ "min": 2, "max": 4 }` |
+| `players` | `{ "min": 2, "max": 8, "botFillTo": 4 }`. `botFillTo` (optional) = how many seats bots fill up to by default; mods change it with `!bg bots <n>` |
 | `seats` | `[{ "id": "red", "name": "Red", "color": "#e5484d" }, …]`. Viewers type `!join <id>` |
 | `needs` | `[]`, or any of `"hiddenInfo"`, `"sendChat"`, `"predictions"`. The game is greyed out if the bridge can't provide them |
 | `commands` | help lines shown in the lobby |
@@ -62,7 +62,12 @@ Return an object with:
 
 Rendering is on demand: the loop only runs during `stage.animate()` calls or after `stage.invalidate()`. Avoid endless idle animations. Each one keeps the GPU busy for the whole stream.
 
-Shared helpers: `renderer/unfold.js` (folding board intro), `renderer/dice.js` (rounded die that lands on a given value), `renderer/pieces.js` (lathe pawn and blob shadow), `renderer/stage.js` (`blobShadow`, `badgeSprite`, easing).
+Shared helpers:
+- `renderer/unfold.js`: folding board intro (square or rectangular via `size`/`depth`, `edgeColor`).
+- `renderer/dice.js`: rounded die that lands on a given value and plays the dice sound. Style it with `faceColor`, `pipColor`, `onePipColor`, `glow`.
+- `renderer/pieces.js`: lathe pawn and blob shadow.
+- `renderer/stage.js`: `blobShadow`, `badgeSprite`, easing.
+- `stage.sfx.play(name, opts)`: shared sounds, `dice`, `step`, `punch`, `whoosh`, `zap`, `teleport`, `slide`, `win` (see `renderer/audio.js`; add new synths to `SYNTHS` and a level to `LEVELS`).
 
 ## Testing
 

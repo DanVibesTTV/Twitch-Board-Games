@@ -123,3 +123,32 @@ test('bridge chat normalizers', () => {
   const sbOld = normalizeSbChat({ message: { message: '!1', userId: '5', username: 'c', displayName: 'C', role: 4 } });
   assert.equal(sbOld.user.isBroadcaster, true);
 });
+
+test('bots fill only up to the game default, adjustable with !bg bots', async () => {
+  const tubesManifest = JSON.parse(readFileSync(new URL('../games/tubes/manifest.json', import.meta.url)));
+  const tubes = await import('../games/tubes/logic.js');
+  const bridge = new DevBridge();
+  const registry = createRegistry([{ ...tubesManifest, needs: [] }], async () => tubes);
+  const s = new Session({ bridge, registry, scheduler: fakeScheduler(), config: { predictions: false } });
+  await s.openLobby('tubes');
+  bridge.inject('alice: !join');
+  bridge.inject('!bg start');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(s.activeSeatIdx.length, 4, 'default botFillTo = 4');
+  s.stop();
+
+  await s.openLobby('tubes');
+  bridge.inject('alice: !join');
+  bridge.inject('!bg bots 8');
+  bridge.inject('!bg start');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(s.activeSeatIdx.length, 8);
+  s.stop();
+
+  await s.openLobby('tubes');
+  bridge.inject('alice: !join');
+  bridge.inject('!bg bots 0');
+  bridge.inject('!bg start');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(s.activeSeatIdx.length, 2, 'still at least min players');
+});
