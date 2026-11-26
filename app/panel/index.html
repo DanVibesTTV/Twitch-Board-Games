@@ -55,6 +55,9 @@
           <label class="field">Volume <span class="muted" id="volume-label"></span>
             <input type="range" min="0" max="1" step="0.05" data-opt="volume"></label>
           <label class="row"><input type="checkbox" data-opt="mute"> Mute</label>
+          <label class="field">Background
+            <select data-opt="bg"><option value="transparent">transparent (for OBS)</option><option value="dark">dark</option><option value="color">solid colour…</option></select></label>
+          <label class="field" id="bgcolor-field" hidden>Colour <input type="color" data-opt="bgcolor"></label>
           <label class="field">Frame rate cap
             <select data-opt="fps"><option value="60">60 fps</option><option value="30">30 fps (lighter)</option></select></label>
         </fieldset>
