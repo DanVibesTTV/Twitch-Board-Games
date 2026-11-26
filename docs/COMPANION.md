@@ -7,7 +7,14 @@
 - saves the overlay's data (viewer stats, trivia categories, question cache) in a file
 - checks this repo for new versions and installs them on request
 
-Start it with **`Start Board Games.bat`** (Windows, double-click) or `npm start` / `node app/companion.mjs [port] [--no-panel]`.
+Start it with **`StreamBoardGames.exe`** (Windows download from the releases), **`Start Board Games.bat`** (Windows with Node.js) or `npm start` / `node app/companion.mjs [port] [--no-panel]`. The exe takes the same arguments.
+
+## The Windows exe
+`StreamBoardGames.exe` is a [Node.js single executable application](https://nodejs.org/api/single-executable-applications.html): a copy of Node.js with a tiny start script embedded (`app/sea-entry.cjs`). That script loads `app/sea-main.mjs` from the folder the exe is in, so all the real code stays as normal files next to the exe, and the in-app updater updates them exactly like a source install. Only Node.js itself (inside the exe) stays at the version it was built with. If a future release needs a newer exe, its release notes will say so.
+
+- **Built by GitHub Actions** (`.github/workflows/build-exe.yml`) on Windows with Node 26: run the tests, build with `node tools/build-exe.mjs` (`--build-sea`, icon and file details set with rcedit), start the exe and check that it answers, then attach `StreamBoardGames-vX.Y.Z-windows-x64.zip` to the release. It also runs on PRs that touch the companion (download from the run's *Artifacts*).
+- **Not code-signed** (a certificate costs money every year), so Windows SmartScreen warns on the first start: **More info → Run anyway**. Some antivirus tools are suspicious of new unsigned exes too; the exe is built from this repo's code by GitHub Actions, and the build log shows exactly how.
+- Errors that stop the app keep the window open until you press Enter, so the message can be read.
 
 ## Twitch login
 The panel's **Log in with Twitch** button uses Twitch's *device code* login: a code appears, you confirm it on twitch.tv/activate, and the app gets a token. Log in with the channel you stream on. Game messages are sent to chat from that account.

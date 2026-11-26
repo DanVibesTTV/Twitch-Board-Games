@@ -81,7 +81,7 @@ export class Updater {
       const files = extractTarGz(Buffer.from(await res.arrayBuffer()));
       // Sanity check before touching anything: it has to look like this project.
       for (const must of ['index.html', 'package.json', 'app/companion.mjs']) {
-        if (!files.has(must)) throw new Error(`download doesn't look like Twitch Board Games (missing ${must})`);
+        if (!files.has(must)) throw new Error(`download doesn't look like Stream Board Games (missing ${must})`);
       }
       const pkg = JSON.parse(files.get('package.json').toString('utf8'));
       if (compareVersions(pkg.version, this.version) <= 0) throw new Error(`downloaded version ${pkg.version} isn't newer`);

@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { SB_ACTIONS } from '../bridges/streamerbot.js';
 
-const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+// Line endings normalized: git on Windows may check files out with CRLF.
+const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
 
 test('BoardGames.sb holds the bridge + resolve actions with the current C#', () => {
   const raw = Buffer.from(read('../streamerbot/BoardGames.sb').trim(), 'base64');

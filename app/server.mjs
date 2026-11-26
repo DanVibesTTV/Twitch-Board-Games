@@ -173,7 +173,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
 
   const base = `http://127.0.0.1:${port}`;
   console.log('');
-  console.log(`  Twitch Board Games companion v${pkg.version}`);
+  console.log(`  Stream Board Games companion v${pkg.version}`);
   console.log(`  Control panel:  ${base}/panel/`);
   console.log(`  OBS overlay:    ${base}/?bridge=node`);
   console.log(`  Data folder:    ${store.dir}`);
@@ -218,9 +218,11 @@ function openPath(target) {
   try { spawn(cmd, args, { detached: true, stdio: 'ignore', windowsVerbatimArguments: process.platform === 'win32' }).on('error', () => {}).unref(); } catch { /* no desktop */ }
 }
 
-// Run directly (the supervisor forks this file).
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const args = process.argv.slice(2);
+// Command line: [port] [--no-panel]. Used when run directly and by the .exe (app/sea-main.mjs).
+export function runServerCli(args = process.argv.slice(2)) {
   startServer({ port: args.find((a) => /^\d+$/.test(a)), openPanel: args.includes('--no-panel') ? false : process.env.BOARDGAMES_RESTARTED ? false : undefined })
     .catch((err) => { console.error(err); process.exit(1); });
 }
+
+// Run directly (the launcher starts this file).
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runServerCli();
