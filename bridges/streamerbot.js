@@ -1,19 +1,17 @@
 // Streamer.bot bridge via its WebSocket server (default ws://127.0.0.1:8080/).
 // Docs: https://docs.streamer.bot/api/servers/websocket/requests
 //
-// Chat comes from the Twitch.ChatMessage event. Everything outgoing runs a
-// named Streamer.bot action through DoAction, so the streamer imports/creates
-// the "BoardGames" actions once (see docs/STREAMERBOT.md).
+// Chat comes from the Twitch.ChatMessage event. Everything outgoing runs one of
+// two Streamer.bot actions through DoAction (setup: docs/STREAMERBOT.md):
+//   "BoardGames · Bridge"  — C# (streamerbot/BoardGamesBridge.cs), args: op + op-specific args
+//   "BoardGames · Resolve" — built-in "Resolve Last Prediction" sub-action, index %winnerIndex0%
+// All args are sent as strings.
 
 import { Bridge, first } from './bridge.js';
 
 export const SB_ACTIONS = {
-  chat: 'BoardGames · Send Chat',              // args: message
-  whisper: 'BoardGames · Whisper',             // args: user, message
-  predictionCreate: 'BoardGames · Prediction Create',   // args: title, outcomes ("a|b|c"), outcomeCount, seconds
-  predictionLock: 'BoardGames · Prediction Lock',
-  predictionResolve: 'BoardGames · Prediction Resolve', // args: winnerIndex (1-based), winnerTitle
-  predictionCancel: 'BoardGames · Prediction Cancel',
+  bridge: 'BoardGames · Bridge',
+  resolve: 'BoardGames · Resolve',
 };
 
 export class StreamerBotBridge extends Bridge {
@@ -26,15 +24,13 @@ export class StreamerBotBridge extends Bridge {
     this.prediction = {
       create: (title, outcomes, seconds) => {
         this.outcomes = outcomes.map((o) => o.replace(/\|/g, '/'));
-        return this.doAction(SB_ACTIONS.predictionCreate, {
-          title, outcomes: this.outcomes.join('|'), outcomeCount: outcomes.length, seconds,
-        });
+        return this.op('predictionCreate', { title, outcomes: this.outcomes.join('|'), seconds });
       },
-      lock: () => this.doAction(SB_ACTIONS.predictionLock),
-      resolve: (index) => this.doAction(SB_ACTIONS.predictionResolve, {
-        winnerIndex: index + 1, winnerTitle: this.outcomes[index] ?? '',
+      lock: () => this.op('predictionLock'),
+      resolve: (index) => this.doAction(SB_ACTIONS.resolve, {
+        winnerIndex0: index, winnerIndex: index + 1, winnerTitle: this.outcomes[index] ?? '',
       }),
-      cancel: () => this.doAction(SB_ACTIONS.predictionCancel),
+      cancel: () => this.op('predictionCancel'),
     };
   }
 
@@ -85,11 +81,14 @@ export class StreamerBotBridge extends Bridge {
   }
 
   doAction(name, args = {}) {
-    return this.request({ request: 'DoAction', action: { name }, args });
+    const strArgs = Object.fromEntries(Object.entries(args).map(([k, v]) => [k, String(v)]));
+    return this.request({ request: 'DoAction', action: { name }, args: strArgs });
   }
 
-  sendChat(text) { return this.doAction(SB_ACTIONS.chat, { message: text }); }
-  whisper(user, text) { return this.doAction(SB_ACTIONS.whisper, { user, message: text }); }
+  op(op, args = {}) { return this.doAction(SB_ACTIONS.bridge, { op, ...args }); }
+
+  sendChat(text) { return this.op('chat', { message: text }); }
+  whisper(user, text) { return this.op('whisper', { user, message: text }); }
 }
 
 // Handles the current payload (data.user / data.text) and the older one (data.message.*).
