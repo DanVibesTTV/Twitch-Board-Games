@@ -1,0 +1,111 @@
+{
+  "id": "jazzy",
+  "name": "Jazzy Dice",
+  "tagline": "Five dice, three rolls, one scorecard. Hold the right dice and go for JAZZ: five alike.",
+  "version": "0.1.0",
+  "coreVersion": "1.0.0",
+  "players": {
+    "min": 2,
+    "max": 4,
+    "botFillTo": 2
+  },
+  "durationMinutes": [
+    6,
+    25
+  ],
+  "needs": [],
+  "thumbnail": "thumbnail.svg",
+  "seats": [
+    {
+      "id": "gold",
+      "name": "Gold",
+      "color": "#f2b632"
+    },
+    {
+      "id": "teal",
+      "name": "Teal",
+      "color": "#1fc7b6"
+    },
+    {
+      "id": "rose",
+      "name": "Rose",
+      "color": "#ff5c8a"
+    },
+    {
+      "id": "violet",
+      "name": "Violet",
+      "color": "#a77bff"
+    }
+  ],
+  "modes": [
+    {
+      "id": "classic",
+      "name": "Classic",
+      "description": "Fill all 13 boxes. Upper bonus of 35 for 63 or more in the top half.",
+      "rules": {
+        "rounds": 13,
+        "upperBonus": true
+      }
+    },
+    {
+      "id": "quick",
+      "name": "Quick",
+      "description": "7 turns each, pick any 7 boxes. No upper bonus.",
+      "rules": {
+        "rounds": 7,
+        "upperBonus": false
+      }
+    },
+    {
+      "id": "chat",
+      "name": "Chat vs Streamer",
+      "description": "The streamer plays Gold, and chat votes on every Teal move. 7 turns each.",
+      "seats": {
+        "gold": "host",
+        "teal": "crowd"
+      },
+      "rules": {
+        "rounds": 7,
+        "upperBonus": false
+      },
+      "howTo": [
+        "The streamer plays Gold. Chat plays Teal by voting: the most popular command wins each step.",
+        "Chat's best move: vote !keep with the dice to hold, e.g. !keep 135 holds dice 1, 3, 5 and rolls the rest.",
+        "!score, then vote for a box on the scorecard with !1–!13.",
+        "JAZZ = five alike: 50 points, every further one +100. 7 turns each, highest total wins."
+      ]
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "!roll",
+      "help": "roll (the dice you aren't holding)"
+    },
+    {
+      "cmd": "!1 … !5",
+      "help": "hold or release a die"
+    },
+    {
+      "cmd": "!keep 135",
+      "help": "hold exactly dice 1, 3 and 5, then roll"
+    },
+    {
+      "cmd": "!score",
+      "help": "pick a box: !1 … !13 on the scorecard"
+    },
+    {
+      "cmd": "!bg mode <classic|quick|chat>",
+      "help": "mods: switch mode in the lobby"
+    }
+  ],
+  "defaultRules": {
+    "rounds": 13,
+    "upperBonus": true
+  },
+  "howTo": [
+    "On your turn: !roll. You get up to 3 rolls.",
+    "Hold dice with !1–!5 (or !keep 135 to hold dice 1, 3, 5 and roll), then !roll again.",
+    "!score, then pick a box on the scorecard with !1–!13. Each box is used once.",
+    "JAZZ = five alike: 50 points, every further one +100. Highest total wins."
+  ]
+}

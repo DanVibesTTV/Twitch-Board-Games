@@ -46,7 +46,9 @@ Return an object with:
 }
 ```
 
-Options can be `disabled: true` (for example a full column). They stay in the list, so `!3` always means option 3; the core rejects disabled picks and the HUD greys them out. With 6 or more options the HUD shows a compact number grid.
+Options can be `disabled: true` (for example a full column). They stay in the list, so `!3` always means option 3; the core rejects disabled picks and the HUD greys them out. With 6 or more options the HUD shows a compact number grid; set `decision.layout = 'list'` to keep the labels.
+
+Options can also be `hidden: true`: they aren't shown and `!<number>` can't pick them, but a game's `command()` hook can (see below). Put them after the visible options so the visible numbers stay 1, 2, 3 … Jazzy Dice uses this for `!keep 135`: 32 hidden "hold exactly these dice and roll" options.
 
 **Everything is a decision.** Rolling dice is a decision with one option (`alias: 'roll'`). The game rolls inside `apply()`. Keep option lists short (ideally 9 or fewer). If a turn has many possibilities, split it into steps, for example "pick a piece" and then "pick a target".
 
@@ -60,6 +62,7 @@ Options can be `disabled: true` (for example a full column). They stay in the li
 | `async prepare({ manifest, mode, rules })` | awaited before `createGame` (max 15 s); whatever it returns arrives as `createGame({ ctx })` |
 | `adminCommand(sub, arg, { say, prefix, refresh })` | handle your own `!bg <sub>` commands in the lobby; return `true` if handled, call `refresh()` to redraw the lobby |
 | `lobbyInfo()` | `{ chips: [{ color, label, ready }], note }` shown in the lobby panel |
+| `game.command(alias, arg)` | map a chat command with an argument to an option index, e.g. `!keep 135` → `('keep', '135')`. Return -1 to fall back to normal alias matching. Can return hidden options; crowd seats vote with it too |
 | `game.timeoutChoice()` | what a timeout means for the current decision (e.g. `'timeout'` = wrong answer); return `undefined` to let the bot move |
 | `decision.seconds` | time limit for this decision instead of the default turn time |
 | `decision.question` | `{ text, category, color, difficulty, final, hq, source }`: the HUD shows a big question card; an `{ type: 'answer', correctIndex, chosen, correct, timeout }` event reveals the result |
@@ -84,10 +87,10 @@ Rendering is on demand: the loop only runs during `stage.animate()` calls or aft
 
 Shared helpers:
 - `renderer/unfold.js`: folding board intro (square or rectangular via `size`/`depth`, `edgeColor`).
-- `renderer/dice.js`: rounded die that lands on a given value and plays the dice sound. Style it with `faceColor`, `pipColor`, `onePipColor`, `glow`.
+- `renderer/dice.js`: rounded die that lands on a given value and plays the dice sound (`roll(v, { sound: false })` when several dice roll together and you play one rattle). Style it with `faceColor`, `pipColor`, `onePipColor`, `glow`.
 - `renderer/pieces.js`: lathe pawn and blob shadow.
 - `renderer/stage.js`: `blobShadow`, `badgeSprite`, easing.
-- `stage.sfx.play(name, opts)`: shared sounds, `dice`, `step`, `punch`, `whoosh`, `zap`, `teleport`, `slide`, `win` (see `renderer/audio.js`; add new synths to `SYNTHS` and a level to `LEVELS`).
+- `stage.sfx.play(name, opts)`: shared sounds, `dice` (`{ dice: n }` for several at once), `step`, `punch`, `whoosh`, `zap`, `teleport`, `slide`, `win`, `clack`, `correct`, `wrong`, `wedge`, `jazz` (`{ big, pitch }`) (see `renderer/audio.js`; add new synths to `SYNTHS` and a level to `LEVELS`).
 
 ## Testing
 

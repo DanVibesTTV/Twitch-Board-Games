@@ -427,7 +427,8 @@ export class Session extends Emitter {
     this.#clearTimer();
     const later = (ms, fn) => this.#setTimer(ms, () => token === this.#token && !this.#busy && fn());
     // Options can be listed but disabled (e.g. a full column), so numbers stay stable.
-    const enabled = d.options.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i !== -1);
+    // Hidden options (shortcuts like Jazzy Dice's !keep) don't count as choices on screen.
+    const enabled = d.options.map((o, i) => (o.disabled || o.hidden ? -1 : i)).filter((i) => i !== -1);
 
     let waitMs;
     if (occ.type === 'bot') {
@@ -474,8 +475,14 @@ export class Session extends Emitter {
     const seatIdx = this.activeSeatIdx[d.seat];
     const occ = this.seats[seatIdx].occupant;
     let index = -1;
-    if (cmd.kind === 'choose') index = cmd.index - 1;
-    else index = d.options.findIndex((o) => o.alias === cmd.alias);
+    if (cmd.kind === 'choose') {
+      index = cmd.index - 1;
+      if (d.options[index]?.hidden) return; // hidden options are only reachable through game.command
+    } else {
+      // A game can map its own commands (with arguments) to an option, e.g. "!keep 135".
+      index = this.game.command?.(cmd.alias, cmd.arg) ?? -1;
+      if (index < 0) index = d.options.findIndex((o) => o.alias === cmd.alias && !o.hidden);
+    }
     if (index < 0 || index >= d.options.length || d.options[index].disabled) return;
 
     if (occ.type === 'human' && occ.user.id === user.id) {

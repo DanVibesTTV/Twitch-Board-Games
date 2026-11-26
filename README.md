@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.10)
+# Twitch Board Games (v0.11)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -7,6 +7,7 @@ Chat-playable board games as a stream overlay: a Three.js board with 3D pieces a
 | **Ludo** | 2–4 | Roll a 6 to leave the yard, race your pawns home, knock rivals back to start. |
 | **Tubes & Teleporters** | 2–8 | Snakes and Ladders in a neon cyberpunk grid: teleporters beam you up, tubes suck you down. |
 | **Four in a Row** | 2 | Drop discs, line up four. Modes: *Duel the Streamer*, *Viewer Duel*, *Chat vs Streamer*. |
+| **Jazzy Dice** | 2–4 | Five dice, three rolls, one scorecard, in a jazz-lounge look with the dice rolling on a vinyl record. Hold dice, go for JAZZ (five alike). Modes: *Classic* (13 boxes), *Quick* (7 turns), *Chat vs Streamer*. |
 | **Trivia Champ** | 2–6 | Trivial Pursuit style on a sci-fi holo-wheel: answer questions from Open Trivia DB, collect category wedges. Modes: *Standard* (4 wedges + final, ~20 min), *Quick* (3 wedges, ~8 min), *Classic* (6 wedges + final, ~40 min). |
 
 ## Use it
@@ -97,7 +98,7 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
-Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
+Options: `game=ludo`, `game=tubes`, `game=four`, `game=trivia` or `game=jazzy` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
 
 **Sound:** tick **"Control audio via OBS"** on the browser source so the game shows up in the audio mixer. All sounds are synthesized in code: a classic set (dice rattle, wooden steps, punch, whoosh) and a futuristic set (zaps, teleport, tube slide, win jingle). To use your own recordings, see `sounds/README.md`. In a normal browser, click the page once to enable audio.
 
@@ -110,7 +111,7 @@ Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the brows
 | crowd | `!1` … | vote for a chat-controlled seat |
 | everyone | `!bgstats`, `!bgstats me`, `!bgstats <game>` | next leaderboard page on the game select screen; your own stats in chat; jump to a game's board |
 | everyone (draw modes) | `!join` | enter the draw; players are picked at random when the lobby closes |
-| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]` / `!bg play trivia [standard\|quick\|classic]`, `!bg mode <mode>`, `!bg cat …` (trivia categories), `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
+| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]` / `!bg play trivia [standard\|quick\|classic]` / `!bg play jazzy [classic\|quick\|chat]`, `!bg mode <mode>`, `!bg cat …` (trivia categories), `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
 
 While a lobby is open, the board area shows a **How to play** panel with the game's steps, the join call-to-action and a big countdown that turns red in the last 10 seconds. Chat gets reminders at **30 s and 10 s left**, with the seat or entry count. Short countdowns skip the reminders that wouldn't fit.
 
@@ -122,6 +123,12 @@ When at least 2 humans play and the connection supports it (Lumia, Streamer.bot,
 - **Categories:** General Knowledge, History, Entertainment (Film + Music + TV + Video Games), Science & Nature, Mathematics, Comics. Mods change them in the lobby with `!bg cat <1-6> <category>` (e.g. `!bg cat 6 sports`), list them with `!bg cat`, and reset with `!bg cat reset`. Choices are saved. Available: general, history, entertainment, science, math, comics, arts, books, film, music, theatre, tv, videogames, boardgames, computers, mythology, sports, geography, politics, art, celebrities, animals, vehicles, gadgets, anime, cartoons.
 - **Questions** come from the [Open Trivia Database](https://opentdb.com) (CC BY-SA 4.0, credited on screen). The API allows one request per IP every 5 seconds, so questions start loading as soon as the lobby opens, and unused ones are cached for next time. A session token avoids repeats. If the API can't be reached, a small built-in question set keeps the game going.
 - A crowd seat (`!bg crowd <seat>`) works too: chat votes on moves and answers.
+
+## Jazzy Dice
+- **Turn:** `!roll`, then up to two more rolls. Between rolls, `!1`–`!5` holds or releases a die (held dice move to the *HELD* lane), and `!roll` rolls the rest. Shortcut: `!keep 135` holds exactly dice 1, 3 and 5 and rolls the others in one go (`!keep` alone rerolls everything).
+- **Scoring:** `!score` (or automatically after the third roll), then pick a box with `!1`–`!13`. The scorecard on the board shows what each box would score right now; `!14` goes back to the dice if rolls are left.
+- **Boxes:** Ones–Sixes (sum of that number; 63+ in total gives a 35 bonus in Classic), Three/Four of a kind (sum of all dice), Full house 25, Small straight 30, Large straight 40, **JAZZ** (five alike) 50, Chance (sum). Every further JAZZ is worth +100 if your JAZZ box holds 50, and works as a joker (classic rules).
+- In *Chat vs Streamer*, chat votes with the same commands; `!keep 135` is the quickest way to vote for a whole move.
 
 ## Viewer stats
 The game select screen shows a leaderboard. `!bgstats` turns the page: **most wins across all games**, then **longest winning streak**, then **most wins per game** (a game's page appears once it has results). `!bgstats me` posts your own numbers in chat: wins, games played, best streak, current streak and best game.
@@ -160,5 +167,6 @@ tests/       npm test  (logic + session, runs in Node)
 - Lumia has no whisper command, so future hidden-information games will need Streamer.bot for private hands.
 - **Companion app** (0.8): Twitch login, stats file, one-click updates, OBS URL builder. Tested live.
 - **Bot account** (0.9): optional bot for the companion's chat messages (first release delivered through the in-app updater). Tested live.
-- **New in 0.10:** Windows exe (`StreamBoardGames.exe`), so streamers don't need Node.js. Built and smoke-tested by GitHub Actions for every release.
+- **Windows exe** (0.10): `StreamBoardGames.exe`, so streamers don't need Node.js. Built and smoke-tested by GitHub Actions for every release. Tested live.
+- **New in 0.11:** Jazzy Dice.
 - **Planned:** a Twitch Extension with a hosted backend for hidden-information games.

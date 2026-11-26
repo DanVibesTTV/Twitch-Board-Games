@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+  <defs>
+    <radialGradient id="bg" cx=".5" cy=".35" r=".8"><stop offset="0" stop-color="#2b2456"/><stop offset="1" stop-color="#110f22"/></radialGradient>
+    <radialGradient id="vinyl" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#2a2a33"/><stop offset=".9" stop-color="#0d0d12"/><stop offset="1" stop-color="#050507"/></radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#c98d1e"/></linearGradient>
+    <linearGradient id="die" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffaf0"/><stop offset="1" stop-color="#e6dcc8"/></linearGradient>
+  </defs>
+  <rect width="150" height="150" rx="12" fill="url(#bg)"/>
+  <rect x="7" y="7" width="136" height="136" rx="8" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity=".8"/>
+  <path d="M7 30 L30 7 M120 7 L143 30 M7 120 L30 143 M120 143 L143 120" stroke="url(#gold)" stroke-width="1.2" opacity=".7"/>
+  <g transform="translate(62 62)">
+    <circle r="46" fill="url(#vinyl)"/>
+    <g fill="none" stroke="#ffffff" stroke-opacity=".07">
+      <circle r="40"/><circle r="35"/><circle r="30"/><circle r="25"/>
+    </g>
+    <path d="M-30 -30 A42 42 0 0 1 20 -38" stroke="#ffffff" stroke-opacity=".18" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <circle r="15" fill="url(#gold)"/>
+    <circle r="2.4" fill="#110f22"/>
+  </g>
+  <g transform="translate(92 96) rotate(-14)">
+    <rect x="-17" y="-17" width="34" height="34" rx="7" fill="url(#die)" stroke="#b9a98a" stroke-width=".8"/>
+    <g fill="#1d1a2e"><circle cx="-8" cy="-8" r="3.4"/><circle cx="8" cy="-8" r="3.4"/><circle r="3.4"/><circle cx="-8" cy="8" r="3.4"/><circle cx="8" cy="8" r="3.4"/></g>
+  </g>
+  <g transform="translate(122 72) rotate(12)">
+    <rect x="-14" y="-14" width="28" height="28" rx="6" fill="url(#die)" stroke="#b9a98a" stroke-width=".8"/>
+    <g fill="#1d1a2e"><circle cx="-6.5" cy="-6.5" r="2.8"/><circle cx="6.5" cy="-6.5" r="2.8"/><circle r="2.8"/><circle cx="-6.5" cy="6.5" r="2.8"/><circle cx="6.5" cy="6.5" r="2.8"/></g>
+  </g>
+  <text x="75" y="136" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-weight="700" font-size="17" fill="url(#gold)">Jazzy Dice</text>
+</svg>
