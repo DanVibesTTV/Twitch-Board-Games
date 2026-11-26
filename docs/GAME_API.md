@@ -23,6 +23,7 @@ games/
 | `seats` | `[{ "id": "red", "name": "Red", "color": "#e5484d" }, …]`. Viewers type `!join <id>` |
 | `needs` | `[]`, or any of `"hiddenInfo"`, `"sendChat"`, `"predictions"`. The game is greyed out if the bridge can't provide them |
 | `commands` | help lines shown in the lobby |
+| `modes` | optional ways to play, e.g. `[{ "id": "streamer", "name": "Duel the Streamer", "description": "…", "seats": { "red": "host" }, "entry": "draw" }]`. Seat roles: `host` (reserved for the broadcaster) and `crowd` (chat votes). `entry: "draw"` = viewers `!join` a pool and open seats are drawn at random when the lobby closes. The first mode is the default; mods pick one with `!bg play <game> <mode>` or `!bg mode <mode>`. |
 | `defaultRules` | passed to `createGame` as `rules` |
 
 ## Logic: `createGame({ seats, rng, rules })`
@@ -40,8 +41,11 @@ Return an object with:
   apply(optionIndex),    // perform it → { events: [...], log: ["text", …] }
   botChoice(),           // index the bot (and AFK fallback) would pick
   ranking(),             // seat indices, winner first
+  isDraw(),              // optional: true when the game ended without a winner (prediction gets refunded)
 }
 ```
+
+Options can be `disabled: true` (for example a full column). They stay in the list, so `!3` always means option 3; the core rejects disabled picks and the HUD greys them out. With 6 or more options the HUD shows a compact number grid.
 
 **Everything is a decision.** Rolling dice is a decision with one option (`alias: 'roll'`). The game rolls inside `apply()`. Keep option lists short (ideally 9 or fewer). If a turn has many possibilities, split it into steps, for example "pick a piece" and then "pick a target".
 

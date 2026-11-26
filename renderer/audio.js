@@ -136,7 +136,7 @@ function dieHit(ctx, out, noise, t, strength) {
 }
 
 // Balances the synths against each other (measured peaks), so they sit at similar loudness.
-export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8 };
+export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6 };
 
 export const SYNTHS = {
   // Rattle that follows the 3D die: a big hit at each of the three bounces,
@@ -279,6 +279,15 @@ SYNTHS.slide = (ctx, out, noise, t, { duration = 1000, gain = 1 } = {}) => {
   o.stop(t + T + 0.05); lfo.stop(t + T + 0.05);
   SYNTHS.whoosh(ctx, out, noise, t, { duration, gain: 0.7 * gain });
   tone(ctx, out, t + T - 0.02, { from: 220, to: 70, dur: 0.18, gain: 0.35 * gain, type: 'sine' }); // pop out
+};
+
+// Plastic disc landing in its slot: bright double click over a hollow knock.
+SYNTHS.clack = (ctx, out, noise, t, { gain = 1, pitch = 1 } = {}) => {
+  const p = pitch * rand(0.95, 1.05);
+  burst(ctx, out, noise, t, { dur: 0.03, freq: 3200 * p, q: 5, gain: 0.5 * gain });
+  burst(ctx, out, noise, t + 0.018, { dur: 0.02, freq: 4200 * p, q: 6, gain: 0.25 * gain });
+  tone(ctx, out, t, { from: 520 * p, to: 260 * p, dur: 0.09, gain: 0.35 * gain, type: 'triangle' });
+  tone(ctx, out, t, { from: 160 * p, to: 90 * p, dur: 0.12, gain: 0.3 * gain, type: 'sine' });
 };
 
 // Short victory arpeggio.
