@@ -56,7 +56,9 @@ export class Session extends Emitter {
     this.decision = null;
     this.votes = new Map();   // userId → option index (crowd seat or game vote)
     this.gameVote = null;     // { options: manifest[] } while a game vote runs
-    this.prediction = null;   // { seatOrder: seatIndex[] } while one is open
+    this.prediction = null;   // set while a prediction is open
+    this.mode = null;         // current game mode (manifest.modes entry) or null
+    this.entrants = new Map(); // userId → user, for modes that draw players at random
     this.#busy = false;
 
     bridge.on('chat', (msg) => this.handleChat(msg));
@@ -88,17 +90,24 @@ export class Session extends Emitter {
     }
   }
 
-  #admin(cmd) {
+  #admin(cmd, msg) {
     const { sub, arg } = cmd;
     if (sub === 'menu') return this.toMenu();
-    if (sub === 'play' && arg) return this.openLobby(arg);
+    if (sub === 'play' && arg) {
+      const [gameId, modeId] = arg.split(/\s+/);
+      return this.openLobby(gameId, modeId, msg?.user);
+    }
+    if (sub === 'mode' && this.phase === 'lobby') {
+      if (!arg) return this.say(this.#modeHelp());
+      return this.openLobby(this.manifest.id, arg, msg?.user);
+    }
     if (sub === 'vote') return this.startGameVote();
     if (sub === 'start') return this.phase === 'lobby' ? this.start() : null;
     if (sub === 'stop') return this.stop();
     if (sub === 'crowd' && this.phase === 'lobby') return this.setCrowdSeat(arg);
     if (sub === 'bot' && this.phase === 'lobby') return this.setBotSeat(arg);
     if (sub === 'bots' && this.phase === 'lobby') return this.setBotFill(arg);
-    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg menu`);
+    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg menu`);
   }
 
   say(text) {
@@ -137,7 +146,9 @@ export class Session extends Emitter {
 
   // ───────────────────────────── lobby ─────────────────────────────
 
-  async openLobby(gameId) {
+  // modeId: one of manifest.modes (default: the first). byUser: who opened it — if that's the
+  // broadcaster and the mode reserves a seat for them, they're seated right away.
+  async openLobby(gameId, modeId = null, byUser = null) {
     const manifest = this.registry.get(gameId);
     if (!manifest) return this.say(`Unknown game "${gameId}".`);
     if (!this.registry.isPlayable(manifest, this.bridge.capabilities)) {
@@ -147,19 +158,61 @@ export class Session extends Emitter {
     this.#teardownGame();
     this.manifest = manifest;
     this.module = await this.registry.load(gameId);
-    this.seats = manifest.seats.map((s) => ({ ...s, occupant: null }));
+    const modes = manifest.modes ?? [];
+    this.mode = modes.find((m) => m.id === modeId) ?? modes[0] ?? null;
+    if (modeId && this.mode?.id !== modeId) this.say(`Unknown mode "${modeId}" — using ${this.mode?.name ?? 'the default'}. ${this.#modeHelp()}`);
+    this.seats = manifest.seats.map((s) => {
+      const role = this.mode?.seats?.[s.id];
+      const occupant = role === 'host' ? { type: 'reserved', role: 'host' } : role === 'crowd' ? { type: 'crowd' } : null;
+      return { ...s, occupant };
+    });
+    this.entrants.clear();
     // Bots fill empty seats until this many seats are taken (games with many seats default lower).
     this.botFillTo = this.config.fillBots ? (manifest.players.botFillTo ?? manifest.players.max) : 0;
     this.phase = 'lobby';
     this.lobbyEndsAt = null;
     this.emit('phase', this.phase);
     this.#emitSeats();
-    this.say(`${manifest.name} lobby is open! Type ${this.config.prefix}join to play (or ${this.config.prefix}join ${manifest.seats[0].id}).`);
+    this.#emitEntrants();
+    const p = this.config.prefix;
+    const how = this.#isDraw() ? `Type ${p}join to enter the draw` : `Type ${p}join to play (or ${p}join ${manifest.seats.find((x) => !x.occupant)?.id ?? manifest.seats[0].id})`;
+    this.say(`${manifest.name}${this.mode ? ` — ${this.mode.name}` : ''} lobby is open! ${how}.`);
+    const host = this.#hostSeat();
+    if (host) {
+      if (byUser?.isBroadcaster) this.join(byUser);
+      else this.say(`Streamer: type ${p}join to take ${host.name}.`);
+    }
+  }
+
+  #isDraw() { return this.mode?.entry === 'draw'; }
+  #hostSeat() { return this.seats.find((s) => s.occupant?.type === 'reserved' && s.occupant.role === 'host') ?? null; }
+  #modeHelp() {
+    const modes = this.manifest?.modes ?? [];
+    return modes.length ? `Modes: ${modes.map((m) => `${m.id} (${m.name})`).join(', ')}` : 'This game has no modes.';
   }
 
   join(user, wanted) {
     if (this.phase !== 'lobby') return;
     if (this.#seatOf(user) !== -1) return;
+    // The seat reserved for the streamer
+    const host = this.#hostSeat();
+    if (host && user.isBroadcaster) {
+      host.occupant = { type: 'human', user, host: true };
+      this.entrants.delete(user.id);
+      this.say(`${user.name} takes ${host.name}!`);
+      this.#emitSeats();
+      this.#emitEntrants();
+      this.#lobbyCountdown();
+      return;
+    }
+    // Draw modes: collect entrants, seats are drawn at random when the lobby closes
+    if (this.#isDraw()) {
+      if (this.entrants.has(user.id)) return;
+      this.entrants.set(user.id, user);
+      this.#emitEntrants();
+      this.#lobbyCountdown();
+      return;
+    }
     const free = this.seats.map((s, i) => [s, i]).filter(([s]) => !s.occupant || s.occupant.type === 'bot');
     if (free.length === 0) return;
     let pick = free.find(([s]) => wanted && (s.id === wanted || s.name.toLowerCase() === wanted));
@@ -171,10 +224,11 @@ export class Session extends Emitter {
   }
 
   leave(user) {
+    if (this.phase === 'lobby' && this.entrants.delete(user.id)) this.#emitEntrants();
     const i = this.#seatOf(user);
     if (i === -1) return;
     if (this.phase === 'lobby') {
-      this.seats[i].occupant = null;
+      this.seats[i].occupant = this.seats[i].occupant.host ? { type: 'reserved', role: 'host' } : null;
       this.#emitSeats();
     } else if (this.phase === 'playing') {
       this.seats[i].occupant = { type: 'bot', replaced: user.name };
@@ -210,8 +264,8 @@ export class Session extends Emitter {
   }
 
   #lobbyCountdown() {
-    const taken = this.seats.filter((s) => s.occupant).length;
-    const full = taken >= this.manifest.players.max;
+    const taken = this.seats.filter((s) => s.occupant && s.occupant.type !== 'reserved').length;
+    const full = !this.#isDraw() && taken >= this.manifest.players.max;
     const secs = full ? this.config.fullStartSeconds : this.config.lobbySeconds;
     const endsAt = Date.now() + secs * 1000;
     // Restart only when it gets shorter (or wasn't running): late joiners don't reset the clock.
@@ -227,6 +281,12 @@ export class Session extends Emitter {
   async start() {
     if (this.phase !== 'lobby') return;
     this.#clearTimer();
+    const host = this.#hostSeat();
+    if (host) {
+      this.lobbyEndsAt = null;
+      return this.say(`Waiting for the streamer — type ${this.config.prefix}join to take ${host.name}.`);
+    }
+    if (this.#isDraw()) this.#drawEntrants();
     const humans = this.seats.filter((s) => s.occupant && s.occupant.type !== 'bot').length;
     if (humans < this.config.minHumans) {
       this.lobbyEndsAt = null;
@@ -262,6 +322,26 @@ export class Session extends Emitter {
     if (this.phase === 'playing') this.#nextDecision();
   }
 
+  // Fills open seats with randomly drawn entrants.
+  #drawEntrants() {
+    const pool = [...this.entrants.values()].filter((u) => this.#seatOf(u) === -1);
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    const drawn = [];
+    for (const seat of this.seats) {
+      if (seat.occupant || pool.length === 0) continue;
+      const user = pool.shift();
+      seat.occupant = { type: 'human', user };
+      drawn.push(`${user.name} (${seat.name})`);
+    }
+    if (drawn.length) this.say(`🎲 Drawn from ${this.entrants.size} entr${this.entrants.size === 1 ? 'y' : 'ies'}: ${drawn.join(' vs ')}!`);
+    this.entrants.clear();
+    this.#emitEntrants();
+    this.#emitSeats();
+  }
+
   stop() {
     if (this.phase === 'playing') {
       this.#cancelPrediction();
@@ -295,14 +375,16 @@ export class Session extends Emitter {
     const token = ++this.#token;
     this.#clearTimer();
     const later = (ms, fn) => this.#setTimer(ms, () => token === this.#token && !this.#busy && fn());
+    // Options can be listed but disabled (e.g. a full column), so numbers stay stable.
+    const enabled = d.options.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i !== -1);
 
     let waitMs;
     if (occ.type === 'bot') {
       waitMs = this.config.botDelayMs;
       later(waitMs, () => this.#apply(this.game.botChoice()));
-    } else if (d.options.length === 1 && (d.kind !== 'roll' || this.config.autoRoll)) {
+    } else if (enabled.length === 1 && (d.kind !== 'roll' || this.config.autoRoll)) {
       waitMs = d.kind === 'roll' ? this.config.botDelayMs : this.config.autoSingleMoveMs;
-      later(waitMs, () => this.#apply(0));
+      later(waitMs, () => this.#apply(enabled[0]));
     } else if (occ.type === 'crowd') {
       waitMs = this.config.voteSeconds * 1000;
       later(waitMs, () => this.#apply(this.#tally(d.options.length) ?? this.game.botChoice()));
@@ -336,7 +418,7 @@ export class Session extends Emitter {
     let index = -1;
     if (cmd.kind === 'choose') index = cmd.index - 1;
     else index = d.options.findIndex((o) => o.alias === cmd.alias);
-    if (index < 0 || index >= d.options.length) return;
+    if (index < 0 || index >= d.options.length || d.options[index].disabled) return;
 
     if (occ.type === 'human' && occ.user.id === user.id) {
       occ.afk = 0;
@@ -358,7 +440,10 @@ export class Session extends Emitter {
     if (this.votes.size === 0) return null;
     const tally = new Array(count).fill(0);
     for (const v of this.votes.values()) tally[v]++;
-    return tally.indexOf(Math.max(...tally));
+    const best = Math.max(...tally);
+    // ties → random among the tied options
+    const tied = tally.map((n, i) => (n === best ? i : -1)).filter((i) => i !== -1);
+    return tied[Math.floor(Math.random() * tied.length)];
   }
 
   async #apply(index) {
@@ -373,8 +458,11 @@ export class Session extends Emitter {
     try {
       result = this.game.apply(index);
     } catch (err) {
+      // Rejected move: restore the turn so the game never stalls.
       console.error('[session] game.apply failed', err);
       this.#busy = false;
+      this.decision = d;
+      this.#runDecision();
       return;
     }
     const seat = this.seats[this.activeSeatIdx[d.seat]];
@@ -388,17 +476,23 @@ export class Session extends Emitter {
 
   #finish() {
     const ranking = this.game.ranking(); // game seat indices, winner first
+    const draw = this.game.isDraw?.() === true;
     const winner = this.seats[this.activeSeatIdx[ranking[0]]];
     this.phase = 'over';
     this.emit('phase', this.phase);
-    this.emit('gameOver', { winner, ranking: ranking.map((g) => this.seats[this.activeSeatIdx[g]]) });
-    this.say(`🏆 ${this.#seatLabel(winner)} wins ${this.manifest.name}!`);
-    this.#resolvePrediction(ranking[0]);
+    this.emit('gameOver', { winner: draw ? null : winner, draw, ranking: ranking.map((g) => this.seats[this.activeSeatIdx[g]]) });
+    if (draw) {
+      this.say(`🤝 ${this.manifest.name} ends in a draw!${this.prediction ? ' Prediction refunded.' : ''}`);
+      this.#cancelPrediction();
+    } else {
+      this.say(`🏆 ${this.#seatLabel(winner)} wins ${this.manifest.name}!`);
+      this.#resolvePrediction(ranking[0]);
+    }
     const token = ++this.#token;
     this.#setTimer(this.config.overSeconds * 1000, () => {
       if (token !== this.#token) return;
       if (this.config.afterGame === 'menu') this.toMenu();
-      else this.openLobby(this.manifest.id);
+      else this.openLobby(this.manifest.id, this.mode?.id);
     });
   }
 
@@ -432,6 +526,7 @@ export class Session extends Emitter {
   #seatLabel(seat) {
     const o = seat.occupant;
     if (o?.type === 'human') return `${o.user.name} (${seat.name})`;
+    if (o?.type === 'reserved') return `Streamer (${seat.name})`;
     if (o?.type === 'crowd') return `Chat (${seat.name})`;
     return `Bot (${seat.name})`;
   }
@@ -442,6 +537,10 @@ export class Session extends Emitter {
 
   #gameSeatIndex(seatIdx) {
     return this.activeSeatIdx?.indexOf(seatIdx) ?? -1;
+  }
+
+  #emitEntrants() {
+    this.emit('entrants', [...this.entrants.values()]);
   }
 
   #emitSeats() {

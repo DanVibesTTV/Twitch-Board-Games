@@ -127,3 +127,15 @@ body.preview { background: radial-gradient(circle at 40% 40%, #3b3548, #15131c);
 @keyframes pop { from { opacity: 0; transform: scale(.85) translateY(10px); } to { opacity: 1; transform: none; } }
 @keyframes slide { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
 body:has(.dev-console) .hud-toasts { bottom: 72px; }
+
+/* modes, draws, column grid */
+.mode-tag { display: inline-block; font-size: .72em; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #1d1a26; background: var(--accent); border-radius: 6px; padding: 2px 8px; margin-bottom: 6px; }
+.entrants { color: var(--muted); }
+.entrants b { color: var(--accent); }
+.game-card .modes { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.game-card .modes span { font-size: .78em; background: rgba(255,255,255,.08); border-radius: 99px; padding: 2px 8px; }
+.options li.disabled { opacity: .3; text-decoration: line-through; }
+.options.grid { grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.options.grid li { flex-direction: column; justify-content: center; gap: 2px; padding: 8px 0; text-align: center; }
+.options.grid li b { min-width: 0; font-size: 1.15em; }
+.options.grid li.disabled { text-decoration: none; }

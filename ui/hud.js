@@ -30,12 +30,14 @@ export class Hud {
     root.append(this.side, this.menu, this.toasts, this.banner);
 
     this.seats = [];
+    this.entrants = [];
     this.logLines = [];
     this.status = { state: 'connecting', detail: '' };
 
     session.on('phase', (p) => this.#phase(p));
     session.on('seats', (seats) => { this.seats = seats; this.#renderSeats(); if (session.phase === 'lobby') this.#renderLobby(this.lobbyTimer); });
     session.on('lobbyTimer', (t) => { this.lobbyTimer = t; this.#renderLobby(t); });
+    session.on('entrants', (list) => { this.entrants = list; if (session.phase === 'lobby') this.#renderLobby(this.lobbyTimer); });
     session.on('decision', (d) => this.#renderDecision(d));
     session.on('votes', (tally) => this.#renderVotes(tally));
     session.on('log', ({ seat, text }) => this.#log(text, seat?.color));
@@ -85,7 +87,8 @@ export class Hud {
         <div class="info">
           <h2>${esc(m.name)}</h2>
           <p>${esc(m.tagline ?? '')}</p>
-          <div class="meta">${m.players.min}–${m.players.max} players${m.durationMinutes ? ` · ${m.durationMinutes[0]}–${m.durationMinutes[1]} min` : ''}</div>
+          <div class="meta">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${m.durationMinutes ? ` · ${m.durationMinutes[0]}–${m.durationMinutes[1]} min` : ''}</div>
+          ${m.modes?.length ? `<div class="modes">${m.modes.map((md) => `<span title="${esc(md.description ?? '')}">${esc(md.name)}</span>`).join('')}</div>` : ''}
           ${ok ? `<code>${this.p}bg play ${esc(m.id)}</code>` : `<div class="needs">Needs: ${esc(this.registry.missing(m, caps).join(', '))}</div>`}
         </div>`;
       grid.append(card);
@@ -97,8 +100,10 @@ export class Hud {
     const d = this.currentDecision;
     this.seatsBox.innerHTML = this.seats.map((s) => {
       const o = s.occupant;
-      const who = !o ? `<span class="muted">${this.p}join ${esc(s.id)}</span>`
-        : o.type === 'human' ? esc(o.user.name)
+      const draw = this.s.mode?.entry === 'draw' && this.s.phase === 'lobby';
+      const who = !o ? `<span class="muted">${draw ? '🎲 drawn at random' : `${this.p}join ${esc(s.id)}`}</span>`
+        : o.type === 'reserved' ? `⭐ Streamer <span class="muted">· type ${this.p}join</span>`
+        : o.type === 'human' ? `${o.host ? '⭐ ' : ''}${esc(o.user.name)}`
         : o.type === 'crowd' ? '👥 Chat vote'
         : `🤖 Bot${o.replaced ? ` <span class="muted">(for ${esc(o.replaced)})</span>` : ''}`;
       const active = d && d.seat?.id === s.id ? ' active' : '';
@@ -109,10 +114,18 @@ export class Hud {
   #renderLobby(t) {
     if (this.s.phase !== 'lobby') return;
     const m = this.s.manifest;
+    const mode = this.s.mode;
+    const draw = mode?.entry === 'draw';
+    const openSeat = this.seats.find((x) => !x.occupant) ?? m.seats[0];
+    const recent = this.entrants.slice(-6).map((u) => esc(u.name)).join(', ');
     this.main.innerHTML = `
-      <div class="big">Join the game!</div>
-      <p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(m.seats[0].id)}</b> to pick a color.</p>
-      <p class="muted">${m.players.min}–${m.players.max} players${this.s.botFillTo ? ` · bots fill up to ${this.s.botFillTo} seats` : ''}</p>
+      ${mode ? `<div class="mode-tag">${esc(mode.name)}</div>` : ''}
+      <div class="big">${draw ? 'Enter the draw!' : 'Join the game!'}</div>
+      ${mode?.description ? `<p>${esc(mode.description)}</p>` : ''}
+      ${draw
+        ? `<p>Type <b>${this.p}join</b> to enter. <span class="entrants"><b>${this.entrants.length}</b> entered${recent ? `: ${this.entrants.length > 6 ? '… ' : ''}${recent}` : ''}</span></p>`
+        : `<p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(openSeat.id)}</b> to pick a color.</p>`}
+      <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${this.s.botFillTo ? ` · empty seats become bots` : ''}${m.modes?.length > 1 ? ` · mods: ${this.p}bg mode ${m.modes.map((x) => x.id).join('|')}` : ''}</p>
       ${t ? `<div class="label">Starting in</div>${this.#timerBar(t.endsAt, t.total, true)}` : '<div class="muted">Countdown starts with the first player.</div>'}
       <div class="help">${(m.commands ?? []).map((c) => `<div><b>${esc(c.cmd)}</b> ${esc(c.help)}</div>`).join('')}</div>`;
   }
@@ -132,8 +145,11 @@ export class Hud {
       <div class="prompt">${esc(d.prompt)}</div>
       ${this.#timerBar(payload.endsAt, payload.total)}
       <div class="hint">${hint}</div>
-      ${showOptions ? `<ol class="options">${d.options.map((o, i) => `
-        <li><b>${this.p}${o.alias && d.options.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>` : ''}`;
+      ${!showOptions ? '' : d.options.length >= 6
+        ? `<ol class="options grid">${d.options.map((o, i) => `
+        <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"><b>${this.p}${i + 1}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`
+        : `<ol class="options">${d.options.map((o, i) => `
+        <li class="${o.disabled ? 'disabled' : ''}"><b>${this.p}${o.alias && d.options.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`}`;
   }
 
   #renderVotes(tally) {
@@ -184,8 +200,19 @@ export class Hud {
     while (this.toasts.children.length > 3) this.toasts.firstChild.remove();
   }
 
-  #gameOver({ winner, ranking }) {
+  #gameOver({ winner, ranking, draw }) {
     const medals = ['🥇', '🥈', '🥉', '4.'];
+    if (draw) {
+      this.banner.innerHTML = `
+      <div class="win" style="--c:#9aa3b5">
+        <div class="trophy">🤝</div>
+        <div class="who">Draw!</div>
+        <div class="muted">${ranking.map((s) => esc(labelOf(s))).join(' vs ')}</div>
+      </div>`;
+      this.banner.classList.add('show');
+      this.main.innerHTML = '<div class="muted">Back to game select shortly…</div>';
+      return;
+    }
     this.banner.innerHTML = `
       <div class="win" style="--c:${esc(winner.color)}">
         <div class="trophy">🏆</div>
@@ -200,6 +227,7 @@ export class Hud {
 
 function labelOf(seat) {
   const o = seat.occupant;
+  if (o?.type === 'reserved') return `Streamer (${seat.name})`;
   if (o?.type === 'human') return `${o.user.name} (${seat.name})`;
   if (o?.type === 'crowd') return `Chat (${seat.name})`;
   return `Bot (${seat.name})`;

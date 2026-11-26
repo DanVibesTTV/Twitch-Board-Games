@@ -152,3 +152,127 @@ test('bots fill only up to the game default, adjustable with !bg bots', async ()
   await new Promise((r) => setImmediate(r));
   assert.equal(s.activeSeatIdx.length, 2, 'still at least min players');
 });
+
+// ── Four in a Row: modes, random draw, predictions, draws ──
+async function fourSetup(extra = {}) {
+  const man = JSON.parse(readFileSync(new URL('../games/four/manifest.json', import.meta.url)));
+  const four = await import('../games/four/logic.js');
+  const bridge = new DevBridge();
+  bridge.calls = [];
+  bridge.prediction = {
+    create: async (...a) => bridge.calls.push(['create', ...a]),
+    lock: async () => {},
+    resolve: async (i) => bridge.calls.push(['resolve', i]),
+    cancel: async () => bridge.calls.push(['cancel']),
+  };
+  const registry = createRegistry([{ ...man, needs: [] }], async () => ({ ...four, ...extra }));
+  const sched = fakeScheduler();
+  const s = new Session({ bridge, registry, scheduler: sched, config: { afterGame: 'menu', afkLimit: 1 } });
+  return { s, bridge, sched };
+}
+const tick = () => new Promise((r) => setImmediate(r));
+
+test('Duel the Streamer: streamer gets Red, one entrant is drawn for Yellow, prediction opens', async () => {
+  const { s, bridge, sched } = await fourSetup();
+  bridge.inject('!bg play four streamer'); // typed by the streamer
+  await tick();
+  assert.equal(s.mode.id, 'streamer');
+  assert.equal(s.seats[0].occupant.user.name, 'streamer');
+  for (const n of ['a', 'b', 'c', 'd']) bridge.inject(`${n}: !join`);
+  bridge.inject('a: !join'); // duplicate ignored
+  assert.equal(s.entrants.size, 4);
+  assert.equal(s.seats[1].occupant, null, 'nobody seated before the draw');
+  await sched.runAll();
+  const create = bridge.calls.find((c) => c[0] === 'create');
+  assert.ok(create, 'prediction created');
+  assert.match(create[2][0], /^streamer \(Red\)$/);
+  assert.match(create[2][1], /^[abcd] \(Yellow\)$/);
+  assert.ok(bridge.calls.some((c) => c[0] === 'resolve' || c[0] === 'cancel'));
+});
+
+test('Duel the Streamer opened by a mod waits for the streamer', async () => {
+  const { s, bridge } = await fourSetup();
+  bridge.inject('@moddy: !bg play four streamer');
+  await tick();
+  assert.equal(s.seats[0].occupant.type, 'reserved');
+  bridge.inject('viewer: !join red'); // viewers can't take the streamer seat
+  assert.equal(s.seats[0].occupant.type, 'reserved');
+  bridge.inject('@moddy: !bg start');
+  await tick();
+  assert.equal(s.phase, 'lobby', 'does not start without the streamer');
+  bridge.inject('streamer: !join');
+  assert.equal(s.seats[0].occupant.user.name, 'streamer');
+});
+
+test('Viewer Duel draws two different viewers', async () => {
+  const { s, bridge } = await fourSetup();
+  bridge.inject('!bg play four duel');
+  await tick();
+  for (const n of ['a', 'b', 'c']) bridge.inject(`${n}: !join`);
+  bridge.inject('!bg start');
+  await tick();
+  assert.equal(s.phase, 'playing');
+  const names = s.seats.map((x) => x.occupant.user.name);
+  assert.equal(new Set(names).size, 2);
+  assert.ok(names.every((n) => ['a', 'b', 'c'].includes(n)));
+  s.stop();
+});
+
+test('Chat vs Streamer: Yellow is a crowd seat, full columns are rejected', async () => {
+  const { s, bridge } = await fourSetup();
+  bridge.inject('!bg play four chat');
+  await tick();
+  assert.equal(s.seats[0].occupant.user.name, 'streamer');
+  assert.equal(s.seats[1].occupant.type, 'crowd');
+  bridge.inject('!bg start');
+  await tick();
+  assert.equal(s.phase, 'playing');
+  s.game.state.board[0] = [0, 1, 0, 1, 0, 1]; // column 1 full
+  s.game.state.moves = 6;
+  s.decision = s.game.decision();
+  assert.equal(s.decision.options[0].disabled, true);
+  bridge.inject('streamer: !1');
+  assert.equal(s.game.state.moves, 6, 'full column ignored');
+  bridge.inject('streamer: !2');
+  await tick();
+  assert.equal(s.game.state.moves, 7);
+  s.stop();
+});
+
+test('a rejected move restores the turn', async () => {
+  const { s, bridge } = await fourSetup();
+  bridge.inject('!bg play four duel');
+  await tick();
+  bridge.inject('a: !join'); bridge.inject('b: !join');
+  bridge.inject('!bg start');
+  await tick();
+  const d = s.decision;
+  const who = s.seats[s.activeSeatIdx[d.seat]].occupant.user.name;
+  s.game.state.board[3] = [0, 1, 0, 1, 0, 1]; // fill column 4 behind the decision's back
+  bridge.inject(`${who}: !4`); // stale "enabled" → game.apply throws
+  await tick();
+  assert.ok(s.decision, 'turn restored');
+  s.stop();
+});
+
+test('a draw refunds the prediction', async () => {
+  const { s, bridge, sched } = await fourSetup();
+  const over = [];
+  s.on('gameOver', (o) => over.push(o));
+  bridge.inject('!bg play four duel');
+  await tick();
+  bridge.inject('a: !join'); bridge.inject('b: !join');
+  bridge.inject('!bg start');
+  await tick();
+  s.game.isDraw = () => true;   // end the game as a draw after the next move
+  const realDecision = s.game.decision;
+  let moved = false;
+  s.game.decision = () => (moved ? null : realDecision());
+  const realApply = s.game.apply;
+  s.game.apply = (i) => { moved = true; return realApply(i); };
+  await sched.runAll();
+  assert.equal(over[0]?.draw, true);
+  assert.ok(bridge.calls.some((c) => c[0] === 'create'));
+  assert.ok(bridge.calls.some((c) => c[0] === 'cancel'), 'prediction cancelled on draw');
+  assert.ok(!bridge.calls.some((c) => c[0] === 'resolve'));
+});
