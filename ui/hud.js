@@ -33,6 +33,12 @@ export class Hud {
 
     this.seats = [];
     this.entrants = [];
+    this.secondsPerCard = 7; // carousel speed: each card takes this long to pass
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => this.s.phase === 'menu' && this.#fitCarousel(), 200);
+    });
     this.logLines = [];
     this.status = { state: 'connecting', detail: '' };
 
@@ -85,7 +91,10 @@ export class Hud {
     const head = el('div', 'menu-head', vote
       ? `<h1>Vote for the next game</h1><p>Type <b>${this.p}1</b>, <b>${this.p}2</b> … in chat</p>${this.#timerBar(vote.endsAt, vote.total)}`
       : `<h1>Pick a game</h1><p>Streamer/mods: <b>${this.p}bg play &lt;game&gt;</b> or <b>${this.p}bg vote</b></p>`);
-    const grid = el('div', 'menu-grid');
+    // One row of cards; once they don't fit it becomes an endless right-to-left carousel.
+    const carousel = el('div', 'menu-carousel');
+    const grid = el('div', 'menu-track');
+    carousel.append(grid);
     const list = vote ? vote.options : this.registry.list;
     list.forEach((m, i) => {
       const ok = this.registry.isPlayable(m, caps);
@@ -102,7 +111,28 @@ export class Hud {
         </div>`;
       grid.append(card);
     });
-    this.menu.append(head, grid);
+    this.menu.append(head, carousel);
+    requestAnimationFrame(() => this.#fitCarousel());
+  }
+
+  // Scroll only when the cards overflow. The cards are duplicated once, so moving the track
+  // by exactly half its width loops seamlessly. Re-checked on resize.
+  #fitCarousel() {
+    const carousel = this.menu.querySelector('.menu-carousel');
+    const track = carousel?.querySelector('.menu-track');
+    if (!track) return;
+    track.querySelectorAll('.clone').forEach((c) => c.remove());
+    carousel.classList.remove('scrolling');
+    const cards = [...track.children];
+    if (track.scrollWidth <= carousel.clientWidth + 1 || cards.length < 2) return;
+    for (const card of cards) {
+      const clone = card.cloneNode(true);
+      clone.classList.add('clone');
+      clone.setAttribute('aria-hidden', 'true');
+      track.append(clone);
+    }
+    carousel.style.setProperty('--dur', `${cards.length * this.secondsPerCard}s`);
+    carousel.classList.add('scrolling');
   }
 
   // Leaderboard on the game select screen; !bgstats turns the page.

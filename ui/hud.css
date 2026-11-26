@@ -87,7 +87,14 @@ body.preview { background: radial-gradient(circle at 40% 40%, #3b3548, #15131c);
 .menu-head h1 { margin: 0; font-size: clamp(28px, 3vw, 56px); font-weight: 900; text-shadow: 0 4px 20px rgba(0,0,0,.4); }
 .menu-head p { margin: .3em 0 1em; color: var(--muted); font-size: clamp(14px, 1.2vw, 22px); }
 .menu-head .timer { max-width: 40vw; }
-.menu-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(220px, 18vw, 340px), 1fr)); gap: 2vw; }
+/* game browser: one row, endless carousel once the cards don't fit */
+.menu-carousel { overflow: hidden; padding: 14px 0 30px; margin: -14px 0 -30px; }
+.menu-track { display: flex; width: max-content; }
+.menu-track .game-card { flex: none; width: clamp(260px, 19vw, 360px); margin-right: 2vw; }
+.menu-carousel.scrolling { -webkit-mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent); }
+.menu-carousel.scrolling .menu-track { animation: marquee var(--dur, 30s) linear infinite; will-change: transform; }
+.menu-carousel.scrolling .game-card { animation: none; }
+@keyframes marquee { to { transform: translateX(-50%); } }
 .game-card {
   position: relative; background: var(--card); border: 1px solid var(--card-border); border-radius: 20px; overflow: hidden;
   box-shadow: 0 12px 40px rgba(0,0,0,.3); animation: pop .45s cubic-bezier(.2,1.4,.4,1) both;
