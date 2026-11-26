@@ -10,6 +10,17 @@ import { createRng } from './rng.js';
 
 export const CORE_VERSION = '1.0.0';
 
+// Resolves when `promise` does, or after `ms` — the game keeps going even if an animation hangs.
+function withTimeout(promise, ms, what) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise).finally(() => clearTimeout(timer)),
+    new Promise((resolve) => {
+      timer = setTimeout(() => { console.warn(`[session] ${what} took over ${ms / 1000}s, continuing`); resolve(); }, ms);
+    }),
+  ]);
+}
+
 export const DEFAULT_CONFIG = {
   prefix: '!',
   lobbySeconds: 45,        // countdown after the first player joins
@@ -245,7 +256,7 @@ export class Session extends Emitter {
     this.#openPrediction(humans);
     this.#busy = true;
     try {
-      await this.view?.mount?.(this.module, this.game, this.activeSeatIdx.map((i) => this.seats[i]));
+      await withTimeout(this.view?.mount?.(this.module, this.game, this.activeSeatIdx.map((i) => this.seats[i])), 20000, 'board intro');
     } catch (err) { console.error('[session] view mount failed', err); }
     this.#busy = false;
     if (this.phase === 'playing') this.#nextDecision();
@@ -369,7 +380,7 @@ export class Session extends Emitter {
     const seat = this.seats[this.activeSeatIdx[d.seat]];
     for (const line of result.log ?? []) this.emit('log', { seat, text: line });
     try {
-      await this.view?.present?.(result.events ?? [], this.game);
+      await withTimeout(this.view?.present?.(result.events ?? [], this.game), 15000, 'move animation');
     } catch (err) { console.error('[session] view present failed', err); }
     this.#busy = false;
     this.#nextDecision();

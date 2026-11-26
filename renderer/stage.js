@@ -97,14 +97,28 @@ export class Stage {
       return;
     }
     this.lastFrame = now;
-    for (const a of this.anims) {
-      const t = Math.min(1, (now - a.start) / a.ms);
-      a.fn(a.easing(t));
-      if (t >= 1) { this.anims.delete(a); a.resolve(); }
-    }
-    if (this.anims.size || this.dirty) {
-      this.renderer.render(this.scene, this.camera);
-      this.dirty = false;
+    try {
+      for (const a of this.anims) {
+        // The frame timestamp can be a few ms *before* animate() was called,
+        // so clamp: animations must only ever see t in [0, 1].
+        const t = Math.min(1, Math.max(0, (now - a.start) / a.ms));
+        try {
+          a.fn(a.easing(t));
+        } catch (err) {
+          // One broken animation must never freeze the overlay: end it and move on.
+          console.error('[stage] animation failed, skipping it', err);
+          this.anims.delete(a);
+          a.resolve();
+          continue;
+        }
+        if (t >= 1) { this.anims.delete(a); a.resolve(); }
+      }
+      if (this.anims.size || this.dirty) {
+        this.renderer.render(this.scene, this.camera);
+        this.dirty = false;
+      }
+    } catch (err) {
+      console.error('[stage] render failed', err);
     }
     if (this.anims.size) requestAnimationFrame(this.#tick);
     else this.running = false; // idle: no frames at all until something changes

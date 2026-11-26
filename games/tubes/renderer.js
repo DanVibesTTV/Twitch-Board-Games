@@ -139,8 +139,8 @@ export function createRenderer(stage, { seats }) {
     const s0 = piece.scale.x;
     const tmp = new THREE.Vector3();
     await stage.animate(ms, (k) => {
-      const f = k * (pts.length - 1);
-      const i = Math.min(pts.length - 2, Math.floor(f));
+      const f = Math.min(1, Math.max(0, k)) * (pts.length - 1);
+      const i = Math.max(0, Math.min(pts.length - 2, Math.floor(f)));
       tmp.lerpVectors(pts[i], pts[i + 1], f - i);
       piece.position.copy(tmp);
       // squeeze while inside the tube, spin a little
