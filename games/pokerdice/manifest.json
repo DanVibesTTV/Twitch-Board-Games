@@ -1,0 +1,68 @@
+{
+  "id": "pokerdice",
+  "name": "Poker Dice",
+  "tagline": "Bone dice on a battered pirate table. Roll up to three times for the best poker hand and win the doubloon.",
+  "version": "0.1.0",
+  "coreVersion": "1.0.0",
+  "players": {
+    "min": 2,
+    "max": 4,
+    "botFillTo": 2
+  },
+  "durationMinutes": [
+    3,
+    10
+  ],
+  "needs": [],
+  "thumbnail": "thumbnail.svg",
+  "seats": [
+    { "id": "scarlet", "name": "Scarlet", "color": "#e5483d" },
+    { "id": "ocean", "name": "Ocean", "color": "#3a9be8" },
+    { "id": "jade", "name": "Jade", "color": "#33c27a" },
+    { "id": "gold", "name": "Gold", "color": "#f0bd3a" }
+  ],
+  "modes": [
+    {
+      "id": "match",
+      "name": "First to 3",
+      "description": "Win 3 rounds (doubloons) to win the match.",
+      "rules": { "target": 3 }
+    },
+    {
+      "id": "quick",
+      "name": "Quick",
+      "description": "First to 2 doubloons.",
+      "rules": { "target": 2 }
+    },
+    {
+      "id": "chat",
+      "name": "Chat vs Streamer",
+      "description": "The streamer plays Scarlet, and chat votes on every Ocean move. First to 3.",
+      "seats": { "scarlet": "host", "ocean": "crowd" },
+      "rules": { "target": 3 },
+      "howTo": [
+        "The streamer plays Scarlet. Chat plays Ocean by voting: the most popular command wins each step.",
+        "Chat's best move: vote !keep with the dice to hold, e.g. !keep 135 holds dice 1, 3, 5 and rolls the rest.",
+        "!stand keeps the hand. The best poker hand of the round wins a doubloon.",
+        "First to 3 doubloons wins."
+      ]
+    }
+  ],
+  "commands": [
+    { "cmd": "!roll", "help": "roll (the dice you aren't holding)" },
+    { "cmd": "!1 … !5", "help": "hold or release a die" },
+    { "cmd": "!keep 135", "help": "hold exactly dice 1, 3 and 5, then roll" },
+    { "cmd": "!stand", "help": "keep your hand and end your turn" },
+    { "cmd": "!bg mode <match|quick|chat>", "help": "mods: switch mode in the lobby" }
+  ],
+  "defaultRules": {
+    "target": 3,
+    "maxRounds": 15
+  },
+  "howTo": [
+    "On your turn: !roll. You get up to 3 rolls.",
+    "Hold dice with !1–!5 (or !keep 135 to hold dice 1, 3, 5 and roll), then !roll again, or !stand.",
+    "Best poker hand of the round wins a doubloon: five of a kind beats four, full house, straight, three, two pair, pair.",
+    "Faces: 9, 10, J, Q, K and the skull (A). First to 3 doubloons wins."
+  ]
+}

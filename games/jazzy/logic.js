@@ -10,6 +10,8 @@
 // Scoring follows the classic rules: upper bonus 35 at 63+, "Jazz" (five alike) 50, every further Jazz
 // +100 when the Jazz box holds 50, and the joker rule for further Jazzes.
 
+import { bestKeep, holdOptions, rollDice, applyHold, keepCommand } from '../../core/dice.js';
+
 export const CATEGORIES = [
   { id: 'ones', name: 'Ones', short: '1s', upper: 1 },
   { id: 'twos', name: 'Twos', short: '2s', upper: 2 },
@@ -100,38 +102,6 @@ export function totals(card, jazzBonus, rules = DEFAULT_RULES) {
 // Rough average a box scores over a game; the bot keeps about this much "in reserve" per open box,
 // so it scratches weak boxes (Ones, Jazz) instead of wasting good ones.
 const EXPECTED = [2.1, 5.3, 8.6, 12.2, 15.7, 19.2, 21.7, 13.1, 22.6, 29.5, 32.7, 16.9, 22.0];
-const key = (dice) => [...dice].sort((a, b) => a - b).join('');
-
-// Precomputed once: the 252 possible hands (sorted), every kept subset (462), and for each kept subset
-// the hands that rerolling the rest can produce, with their probabilities.
-const HANDS = [];
-const SUBS = [];
-(function enumerate(prefix, min) {
-  SUBS.push(prefix);
-  if (prefix.length === 5) { HANDS.push(prefix); return; }
-  for (let v = min; v <= 6; v++) enumerate([...prefix, v], v);
-})([], 1);
-const HAND_INDEX = new Map(HANDS.map((h, i) => [h.join(''), i]));
-const SUB_INDEX = new Map(SUBS.map((h, i) => [h.join(''), i]));
-const OUTCOMES = SUBS.map((kept) => {
-  const n = 5 - kept.length;
-  const total = 6 ** n;
-  const tally = new Map();
-  for (let x = 0; x < total; x++) {
-    const d = [...kept];
-    for (let i = 0, v = x; i < n; i++, v = Math.floor(v / 6)) d.push((v % 6) + 1);
-    const h = HAND_INDEX.get(key(d));
-    tally.set(h, (tally.get(h) ?? 0) + 1);
-  }
-  return [...tally].map(([h, c]) => [h, c / total]);
-});
-const subsOf = (dice) => {
-  const out = new Set();
-  for (let mask = 0; mask < 32; mask++) out.add(SUB_INDEX.get(key(dice.filter((_, i) => mask & (1 << i)))));
-  return [...out];
-};
-const HAND_SUBS = HANDS.map(subsOf);
-
 // How good ending the turn with `dice` is: best box by points minus what that box is usually worth.
 function utility(card, dice, rules) {
   const opts = boxOptions(card, dice);
@@ -154,26 +124,9 @@ function utility(card, dice, rules) {
   return { value: best, cat: bestCat };
 }
 
-// Exact expected value of "keep these, reroll the rest" for one and two rolls left.
-function planner(card, rules) {
-  const end = HANDS.map((h) => utility(card, h, rules).value);
-  const ev = (values) => OUTCOMES.map((list) => list.reduce((n, [h, p]) => n + p * values[h], 0));
-  const keep1 = ev(end);                                                          // one roll left
-  const best1 = HANDS.map((_, h) => Math.max(end[h], ...HAND_SUBS[h].map((s) => keep1[s])));
-  const keep2 = ev(best1);                                                        // two rolls left
-  return { end, keep: (sub, rollsLeft) => (rollsLeft >= 2 ? keep2 : keep1)[sub] };
-}
-
 // Best mask of dice to keep (31 = keep everything, i.e. score now).
 export function botKeep(card, dice, rollsLeft, rules = DEFAULT_RULES) {
-  const p = planner(card, rules);
-  let bestMask = 31;
-  let bestV = p.end[HAND_INDEX.get(key(dice))];
-  for (let mask = 0; mask < 31; mask++) {
-    const v = p.keep(SUB_INDEX.get(key(dice.filter((_, i) => mask & (1 << i)))), rollsLeft);
-    if (v > bestV + 1e-9) { bestV = v; bestMask = mask; }
-  }
-  return bestMask;
+  return bestKeep(dice, rollsLeft, (hand) => utility(card, hand, rules).value);
 }
 
 export function botCategory(card, dice, rules = DEFAULT_RULES) {
@@ -211,15 +164,7 @@ export function createGame({ seats, rng, rules: r = {} }) {
       return { seat: s, kind: 'roll', prompt: `Round ${state.round}/${rules.rounds}: roll the dice`, options: [{ label: 'Roll the dice', alias: 'roll' }] };
     }
     if (state.step === 'hold') {
-      const heldCount = state.held.filter(Boolean).length;
-      const options = state.dice.map((d, i) => ({
-        label: `${state.held[i] ? 'Release' : 'Hold'} die ${i + 1} (${d})`,
-        data: { die: i },
-      }));
-      options.push({ label: `Roll ${5 - heldCount} ${5 - heldCount === 1 ? 'die' : 'dice'} again (${state.rollsLeft} left)  · !roll`, alias: 'roll', disabled: heldCount === 5, data: { roll: true } });
-      options.push({ label: 'Score these dice  · !score', alias: 'score', data: { score: true } });
-      // Hidden: !keep <dice> → hold exactly these and roll (mask 31 = score).
-      for (let mask = 0; mask < 32; mask++) options.push({ label: `keep ${mask}`, hidden: true, data: { keep: mask } });
+      const options = holdOptions(state, { done: { label: 'Score these dice', alias: 'score' } });
       return {
         seat: s, kind: 'hold', layout: 'list',
         prompt: `Roll ${3 - state.rollsLeft}/3: ${diceText()}. Hold dice, roll again or score (!keep 135 = hold dice 1, 3, 5 and roll)`,
@@ -238,13 +183,7 @@ export function createGame({ seats, rng, rules: r = {} }) {
   }
 
   function roll() {
-    const rolled = [];
-    state.dice = state.dice.map((d, i) => {
-      if (state.held[i]) return d;
-      rolled.push(i);
-      return rng.int(1, 6);
-    });
-    state.rollsLeft--;
+    const rolled = rollDice(state, rng);
     state.rolled = true;
     state.step = state.rollsLeft === 0 ? 'score' : 'hold';
     const events = [{ type: 'roll', seat: state.current, dice: [...state.dice], rolled, rollsLeft: state.rollsLeft }];
@@ -300,23 +239,10 @@ export function createGame({ seats, rng, rules: r = {} }) {
     if (!opt || opt.disabled) throw new Error(`option ${index} not available`);
     if (d.kind === 'roll') return roll();
     if (d.kind === 'hold') {
-      const data = opt.data;
-      if (data.die !== undefined) {
-        state.held[data.die] = !state.held[data.die];
-        return { events: [{ type: 'hold', die: data.die, held: state.held[data.die] }], log: [] };
-      }
-      if (data.score) { state.step = 'score'; return { events: [{ type: 'toScore' }], log: [] }; }
-      if (data.keep !== undefined) {
-        const events = [];
-        for (let i = 0; i < 5; i++) {
-          const h = !!(data.keep & (1 << i));
-          if (state.held[i] !== h) { state.held[i] = h; events.push({ type: 'hold', die: i, held: h }); }
-        }
-        if (data.keep === 31) { state.step = 'score'; events.push({ type: 'toScore' }); return { events, log: [] }; }
-        const r2 = roll();
-        return { events: [...events, ...r2.events], log: r2.log };
-      }
-      return roll();
+      return applyHold(state, opt, {
+        roll,
+        done: () => { state.step = 'score'; return { events: [{ type: 'toScore' }], log: [] }; },
+      });
     }
     // score step
     if (opt.data.back) { state.step = 'hold'; return { events: [{ type: 'toHold' }], log: [] }; }
@@ -325,13 +251,7 @@ export function createGame({ seats, rng, rules: r = {} }) {
 
   // !keep 135 / !hold 1 3 5 → hidden "keep" option. Returns an option index, or -1.
   function command(alias, arg) {
-    const d = decision();
-    if (!d || d.kind !== 'hold' || !['keep', 'hold'].includes(alias)) return -1;
-    const digits = String(arg ?? '').replace(/[^1-5]/g, '');
-    if (alias === 'hold' && !digits) return -1;
-    let mask = 0;
-    for (const ch of digits) mask |= 1 << (Number(ch) - 1);
-    return d.options.findIndex((o) => o.data?.keep === mask);
+    return keepCommand(decision(), alias, arg);
   }
 
   function botChoice() {
