@@ -14,6 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { zipFolder } from './zip.mjs';
 
@@ -54,19 +55,32 @@ if (!skipExe) {
   const base = join(dist, win ? 'node-base.exe' : 'node-base');
   copyFileSync(process.execPath, base);
   if (win) {
-    // Icon and file details (shown in Explorer → Properties → Details). Done on the plain node.exe copy,
-    // before the app is embedded.
-    const v = pkg.version;
-    execFileSync('npx', ['--yes', 'rcedit@4', base,
-      '--set-icon', join(root, 'app', 'icon.ico'),
-      '--set-file-version', v, '--set-product-version', v,
-      '--set-version-string', 'ProductName', 'Stream Board Games',
-      '--set-version-string', 'FileDescription', 'Stream Board Games companion app',
-      '--set-version-string', 'CompanyName', 'DanVibesTTV',
-      '--set-version-string', 'OriginalFilename', `${NAME}.exe`,
-      '--set-version-string', 'InternalName', NAME,
-      '--set-version-string', 'LegalCopyright', 'Node.js runtime © OpenJS Foundation and contributors',
-    ], { stdio: 'inherit', shell: true });
+    // Icon and file details (shown in Explorer → Properties → Details), set on the plain node.exe copy
+    // before the app is embedded. rcedit is installed into dist/ just for this; if it fails, the exe
+    // still works, just with Node's icon.
+    try {
+      const tools = join(dist, 'build-tools');
+      execFileSync('npm', ['install', '--no-save', '--no-audit', '--no-fund', '--prefix', tools, 'rcedit@4'], { stdio: 'inherit', shell: true });
+      const mod = createRequire(join(tools, 'package.json'))('rcedit');
+      const rcedit = mod.rcedit ?? mod.default ?? mod;
+      await rcedit(base, {
+        icon: join(root, 'app', 'icon.ico'),
+        'file-version': pkg.version,
+        'product-version': pkg.version,
+        'version-string': {
+          ProductName: 'Stream Board Games',
+          FileDescription: 'Stream Board Games companion app',
+          CompanyName: 'DanVibesTTV',
+          OriginalFilename: `${NAME}.exe`,
+          InternalName: NAME,
+          LegalCopyright: 'Node.js runtime (c) OpenJS Foundation and contributors',
+        },
+      });
+      rmSync(tools, { recursive: true, force: true });
+      console.log('icon and file details set');
+    } catch (err) {
+      console.warn(`::warning::could not set the exe icon (${err.message}); continuing with Node's icon`);
+    }
   }
   const config = join(dist, 'sea-config.json');
   writeFileSync(config, JSON.stringify({
