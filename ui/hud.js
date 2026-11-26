@@ -28,7 +28,8 @@ export class Hud {
     this.menu = el('section', 'hud-menu');
     this.toasts = el('div', 'hud-toasts');
     this.banner = el('div', 'hud-banner');
-    root.append(this.side, this.menu, this.toasts, this.banner);
+    this.questionBox = el('section', 'hud-question');
+    root.append(this.side, this.menu, this.questionBox, this.toasts, this.banner);
 
     this.seats = [];
     this.entrants = [];
@@ -46,6 +47,8 @@ export class Hud {
     session.on('gameVote', (v) => this.#renderMenu(v));
     session.on('gameOver', (o) => this.#gameOver(o));
     session.on('stats', (v) => this.#renderStats(v));
+    session.on('gameEvents', (events) => this.#onGameEvents(events));
+    session.on('lobbyInfo', () => this.#renderLobbyInfo());
     bridge.on('status', (st) => { this.status = st; this.#renderHeader(); });
 
     this.#phase(session.phase);
@@ -54,6 +57,9 @@ export class Hud {
   #phase(phase) {
     this.root.dataset.phase = phase;
     this.banner.classList.remove('show');
+    this.#hideQuestion();
+    clearInterval(this.lobbyInfoTimer);
+    if (phase === 'lobby') this.lobbyInfoTimer = setInterval(() => this.#renderLobbyInfo(), 1500);
     this.#renderHeader();
     if (phase === 'menu') {
       this.#renderMenu(null);
@@ -151,7 +157,21 @@ export class Hud {
         : `<p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(openSeat.id)}</b> to pick a color.</p>`}
       <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${this.s.botFillTo ? ` · empty seats become bots` : ''}${m.modes?.length > 1 ? ` · mods: ${this.p}bg mode ${m.modes.map((x) => x.id).join('|')}` : ''}</p>
       ${t ? `<div class="label">Starting in</div>${this.#timerBar(t.endsAt, t.total, true)}` : '<div class="muted">Countdown starts with the first player.</div>'}
+      <div class="lobby-info"></div>
       <div class="help">${(m.commands ?? []).map((c) => `<div><b>${esc(c.cmd)}</b> ${esc(c.help)}</div>`).join('')}</div>`;
+    this.#renderLobbyInfo();
+  }
+
+  // Game-specific lobby details (e.g. trivia categories and whether their questions are loaded).
+  #renderLobbyInfo() {
+    const box = this.main.querySelector('.lobby-info');
+    if (!box || this.s.phase !== 'lobby') return;
+    let info = null;
+    try { info = this.s.module?.lobbyInfo?.(); } catch { /* ignore */ }
+    if (!info) { box.innerHTML = ''; return; }
+    box.innerHTML = `
+      ${info.chips?.length ? `<div class="chips">${info.chips.map((c) => `<span style="--c:${esc(c.color)}" class="${c.ready === false ? 'loading' : ''}"><i></i>${esc(c.label)}${c.ready === false ? ' …' : ''}</span>`).join('')}</div>` : ''}
+      ${info.note ? `<div class="note">${esc(info.note)}</div>` : ''}`;
   }
 
   #renderDecision(payload) {
@@ -159,9 +179,12 @@ export class Hud {
     this.#renderSeats();
     if (!payload) return;
     const { decision: d, seat, occupant } = payload;
+    if (d.question) this.#renderQuestion(payload);
+    else this.#hideQuestion();
     const who = occupant.type === 'human' ? occupant.user.name : occupant.type === 'crowd' ? 'Chat' : 'Bot';
     const showOptions = d.kind !== 'roll' || occupant.type !== 'bot';
-    const hint = occupant.type === 'crowd' ? 'Chat votes — majority wins'
+    const hint = d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
+      : occupant.type === 'crowd' ? 'Chat votes — majority wins'
       : occupant.type === 'bot' ? 'Bot is thinking…'
       : d.kind === 'roll' ? `${who}, type <b>${this.p}roll</b>` : `${who}, type the number`;
     this.main.innerHTML = `
@@ -169,11 +192,60 @@ export class Hud {
       <div class="prompt">${esc(d.prompt)}</div>
       ${this.#timerBar(payload.endsAt, payload.total)}
       <div class="hint">${hint}</div>
-      ${!showOptions ? '' : d.options.length >= 6
+      ${!showOptions || d.question ? '' : d.options.length >= 6
         ? `<ol class="options grid">${d.options.map((o, i) => `
         <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"><b>${this.p}${i + 1}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`
         : `<ol class="options">${d.options.map((o, i) => `
         <li class="${o.disabled ? 'disabled' : ''}"><b>${this.p}${o.alias && d.options.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`}`;
+  }
+
+  // Big question card over the board. Answers: !1…!n; the result is revealed via game events.
+  #renderQuestion({ decision: d, seat, occupant, endsAt, total }) {
+    const q = d.question;
+    const who = occupant.type === 'human' ? `${esc(occupant.user.name)} answers` : occupant.type === 'crowd' ? 'Chat votes' : 'Bot answers';
+    this.questionBox.innerHTML = `
+      <div class="q-card" style="--c:${esc(q.color)}">
+        <div class="q-head">
+          <span class="q-cat">${esc(q.category)}</span>
+          <span class="q-diff q-${esc(q.difficulty)}">${esc(q.difficulty)}</span>
+          ${q.final ? '<span class="q-final">FINAL QUESTION</span>' : q.hq ? '<span class="q-hq">Wedge at stake</span>' : ''}
+          <span class="q-who" style="--s:${esc(seat.color)}"><i></i>${who}</span>
+        </div>
+        <div class="q-text">${esc(q.text)}</div>
+        <ol class="q-answers n${d.options.length}">${d.options.map((o, i) => `
+          <li data-i="${i}"><b>${this.p}${i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>
+        ${this.#timerBar(endsAt, total)}
+        <div class="q-result"></div>
+        <div class="q-foot">${q.source === 'opentdb' ? 'Question: Open Trivia Database (opentdb.com) · CC BY-SA 4.0' : 'Built-in question (Open Trivia DB not reachable)'}</div>
+      </div>`;
+    this.questionBox.classList.add('show');
+  }
+
+  #hideQuestion() {
+    if (this.questionReveal) return; // keep the revealed answer visible until it times out
+    this.questionBox.classList.remove('show');
+  }
+
+  #onGameEvents(events) {
+    const a = events.find((e) => e.type === 'answer');
+    if (!a || !this.questionBox.classList.contains('show')) return;
+    const items = this.questionBox.querySelectorAll('.q-answers li');
+    items.forEach((li, i) => {
+      if (i === a.correctIndex) li.classList.add('right');
+      else if (i === a.chosen) li.classList.add('wrong');
+      else li.classList.add('dim');
+    });
+    const bar = this.questionBox.querySelector('.timer');
+    if (bar) bar.style.visibility = 'hidden';
+    this.questionBox.querySelector('.q-result').innerHTML = a.correct
+      ? '<span class="ok">✅ Correct!</span>'
+      : `<span class="bad">${a.timeout ? "⏰ Time's up!" : '❌ Wrong!'}</span>`;
+    this.questionReveal = true;
+    clearTimeout(this.revealTimer);
+    this.revealTimer = setTimeout(() => {
+      this.questionReveal = false;
+      if (!this.currentDecision?.decision?.question) this.questionBox.classList.remove('show');
+    }, 2800);
   }
 
   #renderVotes(tally) {

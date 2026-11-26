@@ -136,7 +136,7 @@ function dieHit(ctx, out, noise, t, strength) {
 }
 
 // Balances the synths against each other (measured peaks), so they sit at similar loudness.
-export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6 };
+export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6, correct: 2.1, wrong: 1.6, wedge: 3.6 };
 
 export const SYNTHS = {
   // Rattle that follows the 3D die: a big hit at each of the three bounces,
@@ -288,6 +288,33 @@ SYNTHS.clack = (ctx, out, noise, t, { gain = 1, pitch = 1 } = {}) => {
   burst(ctx, out, noise, t + 0.018, { dur: 0.02, freq: 4200 * p, q: 6, gain: 0.25 * gain });
   tone(ctx, out, t, { from: 520 * p, to: 260 * p, dur: 0.09, gain: 0.35 * gain, type: 'triangle' });
   tone(ctx, out, t, { from: 160 * p, to: 90 * p, dur: 0.12, gain: 0.3 * gain, type: 'sine' });
+};
+
+// Quiz: correct answer — two bright rising notes with a sparkle.
+SYNTHS.correct = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  tone(ctx, out, t, { from: 880, to: 880, dur: 0.14, gain: 0.3 * gain, type: 'triangle' });
+  tone(ctx, out, t + 0.11, { from: 1318.5, to: 1318.5, dur: 0.38, gain: 0.32 * gain, type: 'triangle' });
+  tone(ctx, out, t + 0.11, { from: 2637, to: 2637, dur: 0.3, gain: 0.08 * gain, type: 'sine' });
+  for (let i = 0; i < 5; i++) burst(ctx, out, noise, t + 0.15 + i * 0.045, { dur: 0.03, freq: 6000 + i * 600, q: 8, gain: 0.08 * gain });
+};
+
+// Quiz: wrong answer — low falling buzz.
+SYNTHS.wrong = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.value = 1400;
+  f.connect(out);
+  tone(ctx, f, t, { from: 220, to: 150, dur: 0.22, gain: 0.35 * gain, type: 'sawtooth' });
+  tone(ctx, f, t + 0.2, { from: 165, to: 98, dur: 0.38, gain: 0.35 * gain, type: 'sawtooth' });
+};
+
+// Wedge earned: quick rising arpeggio with a shimmer on top.
+SYNTHS.wedge = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  [0, 4, 7, 12, 16, 19, 24].forEach((semi, i) => {
+    const f = 523.25 * 2 ** (semi / 12);
+    tone(ctx, out, t + i * 0.05, { from: f, to: f, dur: 0.2, gain: 0.14 * gain, type: 'square' });
+  });
+  tone(ctx, out, t + 0.35, { from: 2093, to: 2093, dur: 0.5, gain: 0.1 * gain, type: 'sine' });
 };
 
 // Short victory arpeggio.

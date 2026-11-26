@@ -69,6 +69,7 @@ export class Session extends Emitter {
   }
 
   #busy;
+  #starting = false;
   #timer = null;
   #token = 0; // invalidates stale timers/votes whenever the decision changes
 
@@ -113,6 +114,11 @@ export class Session extends Emitter {
     if (sub === 'bot' && this.phase === 'lobby') return this.setBotSeat(arg);
     if (sub === 'bots' && this.phase === 'lobby') return this.setBotFill(arg);
     if (sub === 'stats') return this.#statsAdmin(arg);
+    if (this.phase === 'lobby' && this.module?.adminCommand?.(sub, arg, {
+      say: (t) => this.say(t),
+      prefix: this.config.prefix,
+      refresh: () => this.emit('lobbyInfo'),
+    })) return;
     this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg stats reset [game] confirm, !bg menu`);
   }
 
@@ -166,6 +172,8 @@ export class Session extends Emitter {
     this.module = await this.registry.load(gameId);
     const modes = manifest.modes ?? [];
     this.mode = modes.find((m) => m.id === modeId) ?? modes[0] ?? null;
+    // Games that need data (e.g. trivia questions) start loading while the lobby fills.
+    try { this.module.preload?.({ manifest, mode: this.mode }); } catch (err) { console.warn('[session] preload failed', err); }
     if (modeId && this.mode?.id !== modeId) this.say(`Unknown mode "${modeId}" — using ${this.mode?.name ?? 'the default'}. ${this.#modeHelp()}`);
     this.seats = manifest.seats.map((s) => {
       const role = this.mode?.seats?.[s.id];
@@ -285,7 +293,7 @@ export class Session extends Emitter {
   // ───────────────────────────── game ─────────────────────────────
 
   async start() {
-    if (this.phase !== 'lobby') return;
+    if (this.phase !== 'lobby' || this.#starting) return;
     this.#clearTimer();
     const host = this.#hostSeat();
     if (host) {
@@ -313,10 +321,22 @@ export class Session extends Emitter {
     // Everyone seated as a human now counts as having played, even if they leave later.
     this.participants = this.seats.filter((s) => s.occupant?.type === 'human').map((s) => ({ id: s.occupant.user.id, name: s.occupant.user.name }));
     this.rng = createRng();
+    const rules = { ...(this.manifest.defaultRules ?? {}), ...(this.mode?.rules ?? {}) };
+    // Optional async setup (e.g. waiting for trivia questions). Never blocks for long.
+    let ctx = null;
+    if (this.module.prepare) {
+      this.#starting = true;
+      try {
+        ctx = await withTimeout(this.module.prepare({ manifest: this.manifest, mode: this.mode, rules }), 15000, 'game setup');
+      } catch (err) { console.error('[session] prepare failed', err); }
+      this.#starting = false;
+      if (this.phase !== 'lobby') return; // stopped while loading
+    }
     this.game = this.module.createGame({
       seats: this.activeSeatIdx.map((i) => this.seats[i].id),
       rng: this.rng,
-      rules: this.manifest.defaultRules ?? {},
+      rules,
+      ctx: ctx ?? null,
     });
     this.phase = 'playing';
     this.emit('phase', this.phase);
@@ -394,10 +414,11 @@ export class Session extends Emitter {
       waitMs = d.kind === 'roll' ? this.config.botDelayMs : this.config.autoSingleMoveMs;
       later(waitMs, () => this.#apply(enabled[0]));
     } else if (occ.type === 'crowd') {
-      waitMs = this.config.voteSeconds * 1000;
-      later(waitMs, () => this.#apply(this.#tally(d.options.length) ?? this.game.botChoice()));
+      // a decision can ask for more time (e.g. reading a trivia question)
+      waitMs = Math.max(this.config.voteSeconds, d.seconds ?? 0) * 1000;
+      later(waitMs, () => this.#apply(this.#tally(d.options.length) ?? this.#timeoutChoice()));
     } else {
-      waitMs = this.config.turnSeconds * 1000;
+      waitMs = (d.seconds ?? this.config.turnSeconds) * 1000;
       later(waitMs, () => {
         occ.afk = (occ.afk ?? 0) + 1;
         if (occ.afk >= this.config.afkLimit) {
@@ -405,7 +426,7 @@ export class Session extends Emitter {
           seat.occupant = { type: 'bot', replaced: occ.user.name };
           this.#emitSeats();
         }
-        this.#apply(this.game.botChoice());
+        this.#apply(this.#timeoutChoice());
       });
     }
     this.emit('decision', {
@@ -416,6 +437,12 @@ export class Session extends Emitter {
       total: waitMs / 1000,
     });
     this.view?.decision?.(d, seat);
+  }
+
+  // What happens when time runs out: the game may decide (e.g. a trivia answer counts as wrong),
+  // otherwise the bot plays the move.
+  #timeoutChoice() {
+    return this.game.timeoutChoice?.() ?? this.game.botChoice();
   }
 
   #playerInput(user, cmd) {
@@ -476,6 +503,7 @@ export class Session extends Emitter {
     const seat = this.seats[this.activeSeatIdx[d.seat]];
     for (const line of result.log ?? []) this.emit('log', { seat, text: line });
     try {
+      this.emit('gameEvents', result.events ?? []);
       await withTimeout(this.view?.present?.(result.events ?? [], this.game), 15000, 'move animation');
     } catch (err) { console.error('[session] view present failed', err); }
     this.#busy = false;
