@@ -15,7 +15,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
+// No System.Linq on purpose: Streamer.bot doesn't reference System.Core by default.
 
 public class CPHInline
 {
@@ -34,12 +34,12 @@ public class CPHInline
 
             case "predictionCreate":
             {
-                List<string> outcomes = Arg("outcomes")
-                    .Split('|')
-                    .Select(s => s.Trim())
-                    .Where(s => s.Length > 0)
-                    .Take(10)
-                    .ToList();
+                List<string> outcomes = new List<string>();
+                foreach (string part in Arg("outcomes").Split('|'))
+                {
+                    string title = part.Trim();
+                    if (title.Length > 0 && outcomes.Count < 10) outcomes.Add(title);
+                }
                 if (outcomes.Count < 2)
                 {
                     CPH.LogWarn("[BoardGames] prediction needs at least 2 outcomes");
