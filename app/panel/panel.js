@@ -8,6 +8,83 @@ let status = null;
 let login = null;   // pending device code { user_code, verification_uri }
 let version = null;
 
+// ---- OBS URL options (defaults match main.js; only changed values go into the URL) ----
+const DEFAULTS = { game: '', mode: '', after: 'menu', turn: 30, lobby: 45, vote: 15, bots: true, predictions: true, stats: true, prefix: '!', volume: 0.8, mute: false, fps: '60' };
+let options = { ...DEFAULTS };
+let games = [];   // manifests, for the game and mode lists
+
+function optionInputs() { return [...document.querySelectorAll('[data-opt]')]; }
+
+function readOptions() {
+  const o = {};
+  for (const el of optionInputs()) {
+    const k = el.dataset.opt;
+    if (el.type === 'checkbox') o[k] = el.checked;
+    else if (el.type === 'number' || el.type === 'range') o[k] = el.value === '' ? DEFAULTS[k] : Number(el.value);
+    else o[k] = el.value;
+  }
+  if (!o.prefix.trim()) o.prefix = '!';
+  return o;
+}
+
+function writeOptions(o) {
+  for (const el of optionInputs()) {
+    const v = o[el.dataset.opt] ?? DEFAULTS[el.dataset.opt];
+    if (el.type === 'checkbox') el.checked = !!v;
+    else el.value = String(v);
+  }
+}
+
+function renderModes() {
+  const m = games.find((g) => g.id === $('obs-options').querySelector('[data-opt=game]').value);
+  const select = document.querySelector('[data-opt=mode]');
+  const keep = options.mode;
+  select.innerHTML = '<option value="">game\'s default</option>' + (m?.modes ?? []).map((md) => `<option value="${esc(md.id)}">${esc(md.name)}</option>`).join('');
+  select.value = (m?.modes ?? []).some((md) => md.id === keep) ? keep : '';
+  $('mode-field').hidden = !m?.modes?.length;
+}
+
+// Booleans that default to true are written as =0 when switched off; the rest only when they differ.
+function obsQuery(o) {
+  const q = new URLSearchParams({ bridge: 'node' });
+  for (const [k, def] of Object.entries(DEFAULTS)) {
+    let v = o[k];
+    if (k === 'mode' && !o.game) continue;
+    if (v === def || v === undefined || (typeof def === 'number' && Number(v) === def)) continue;
+    if (typeof def === 'boolean') v = v ? '1' : '0';
+    if (v === '') continue;
+    q.set(k, String(v));
+  }
+  return q.toString().replace(/%21/g, '!');
+}
+
+function renderUrl() {
+  $('obs-url').value = `${location.origin}/?${obsQuery(options)}`;
+  $('preview').href = `${location.origin}/?${obsQuery(options)}&preview=1`;
+  $('volume-label').textContent = `${Math.round(options.volume * 100)}%${options.mute ? ' (muted)' : ''}`;
+}
+
+let saveTimer;
+function onOptionChange(ev) {
+  options = readOptions();
+  if (ev?.target?.dataset.opt === 'game') { renderModes(); options = readOptions(); }
+  renderUrl();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    api('/api/settings', { obsOptions: options }).then(() => { $('options-msg').textContent = 'Saved'; setTimeout(() => { $('options-msg').textContent = ''; }, 1500); })
+      .catch((err) => { $('options-msg').textContent = err.message; });
+  }, 400);
+}
+
+async function loadGames() {
+  try {
+    const ids = await (await fetch('/games/index.json')).json();
+    games = (await Promise.all(ids.map((id) => fetch(`/games/${id}/manifest.json`).then((r) => r.json()).catch(() => null)))).filter(Boolean);
+  } catch { games = []; }
+  const select = document.querySelector('[data-opt=game]');
+  select.insertAdjacentHTML('beforeend', games.map((g) => `<option value="${esc(g.id)}">${esc(g.name)} lobby</option>`).join(''));
+}
+
 async function api(path, body) {
   const res = await fetch(path, { method: body === undefined ? 'GET' : 'POST', headers: H, body: body === undefined ? undefined : JSON.stringify(body) });
   const text = await res.text();
@@ -25,10 +102,15 @@ function toast(text, ms = 3500) {
 
 async function refresh() {
   status = await api('/api/status');
-  const base = `${location.origin}`;
   $('version').textContent = `v${status.version}`;
-  $('obs-url').value = `${base}/?bridge=node`;
-  $('preview').href = `${base}/?bridge=node&preview=1`;
+  if (!refresh.loaded) {
+    refresh.loaded = true;
+    options = { ...DEFAULTS, ...status.settings.obsOptions };
+    writeOptions(options);
+    renderModes();
+    writeOptions(options);
+  }
+  renderUrl();
   $('data-dir').value = status.dataDir;
   $('set-autoCheck').checked = status.settings.autoCheck;
   $('set-openPanel').checked = status.settings.openPanel;
@@ -113,6 +195,14 @@ document.addEventListener('click', (ev) => {
   if (!id) return;
   navigator.clipboard.writeText($(id).value).then(() => toast('Copied'), () => { $(id).select(); toast('Press Ctrl+C to copy'); });
 });
+$('obs-options').addEventListener('input', onOptionChange);
+$('obs-options').addEventListener('change', onOptionChange);
+$('reset-options').addEventListener('click', () => {
+  options = { ...DEFAULTS };
+  writeOptions(options);
+  renderModes();
+  onOptionChange();
+});
 $('open-data').addEventListener('click', () => api('/api/open-data', {}).catch((err) => toast(err.message)));
 $('save-settings').addEventListener('click', async () => {
   try {
@@ -148,4 +238,4 @@ events.addEventListener('twitch', (ev) => {
 });
 events.addEventListener('update', (ev) => renderUpdate(JSON.parse(ev.data)));
 
-refresh().catch((err) => { document.querySelector('main').insertAdjacentHTML('afterbegin', `<p class="note">${esc(err.message)}</p>`); });
+loadGames().then(refresh).catch((err) => { document.querySelector('main').insertAdjacentHTML('afterbegin', `<p class="note">${esc(err.message)}</p>`); });

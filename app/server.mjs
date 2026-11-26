@@ -82,7 +82,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
         version: pkg.version, port, dataDir: store.dir,
         twitch: twitch.state, clientIdSource: settings.twitchClientId ? 'settings' : appInfo.clientId ? 'app' : 'none',
         update: await updater.status(),
-        settings: { autoCheck: settings.autoCheck !== false, openPanel: settings.openPanel !== false, updateRepo: updater.repo, twitchClientId: settings.twitchClientId ?? '' },
+        settings: { autoCheck: settings.autoCheck !== false, openPanel: settings.openPanel !== false, updateRepo: updater.repo, twitchClientId: settings.twitchClientId ?? '', obsOptions: settings.obsOptions ?? {} },
       });
     }
     // overlay storage
@@ -112,6 +112,10 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       if ('autoCheck' in body) patch.autoCheck = !!body.autoCheck;
       if ('openPanel' in body) patch.openPanel = !!body.openPanel;
       if ('twitchClientId' in body) patch.twitchClientId = String(body.twitchClientId).trim();
+      if (body.obsOptions && typeof body.obsOptions === 'object') {
+        patch.obsOptions = Object.fromEntries(Object.entries(body.obsOptions)
+          .filter(([k, v]) => /^[a-z]+$/.test(k) && ['string', 'number', 'boolean'].includes(typeof v)).slice(0, 30));
+      }
       if ('updateRepo' in body) patch.updateRepo = /^[\w.-]+\/[\w.-]+$/.test(body.updateRepo) ? body.updateRepo : DEFAULT_REPO;
       await store.saveSettings(patch);
       return json(res, 200, { ok: true, restartNeeded: 'twitchClientId' in body || 'updateRepo' in body });

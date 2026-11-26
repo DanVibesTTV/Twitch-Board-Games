@@ -28,7 +28,7 @@ A small program that serves the overlay, logs in to Twitch itself and keeps ever
 2. Download this repo (green **Code** button → **Download ZIP**) and extract it somewhere permanent, e.g. `Documents\Twitch Board Games`.
 3. **Windows:** double-click **`Start Board Games.bat`**. **macOS/Linux:** open a terminal in the folder and run `npm start` (same as `node app/companion.mjs`).
 4. The control panel opens in your browser (`http://127.0.0.1:8765/panel/`). Click **Log in with Twitch**, confirm the code on twitch.tv, done.
-5. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`** (the panel has a copy button).
+5. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`**. The panel's OBS section has checkboxes and fields for the game options and builds the URL for you (copy button included).
 
 Keep the app's window open while you stream. Details, troubleshooting and how updates work: [`docs/COMPANION.md`](docs/COMPANION.md).
 
@@ -89,7 +89,7 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
-Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the browser), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
+Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
 
 **Sound:** tick **"Control audio via OBS"** on the browser source so the game shows up in the audio mixer. All sounds are synthesized in code: a classic set (dice rattle, wooden steps, punch, whoosh) and a futuristic set (zaps, teleport, tube slide, win jingle). To use your own recordings, see `sounds/README.md`. In a normal browser, click the page once to enable audio.
 

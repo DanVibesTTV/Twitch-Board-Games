@@ -42,6 +42,9 @@ test('companion server: serves the overlay and panel, guards the API, stores ove
     assert.equal((await get(port, '/api/kv/notours', { method: 'PUT', headers: H, body: '{"value":"x"}' })).status, 400);
     assert.deepEqual(JSON.parse((await get(port, '/api/kv', { headers: H })).body), { 'boardgames.stats.v1': '{"a":1}' });
 
+    await get(port, '/api/settings', { method: 'POST', headers: H, body: JSON.stringify({ obsOptions: { turn: 20, bots: false, 'bad key': 1, obj: { x: 1 } } }) });
+    assert.deepEqual(JSON.parse((await get(port, '/api/status', { headers: H })).body).settings.obsOptions, { turn: 20, bots: false }, 'OBS options saved, junk dropped');
+
     const ev = await get(port, '/api/events');
     assert.match(ev.body, /event: hello/);
   } finally {

@@ -22,8 +22,42 @@
       <h2>OBS</h2>
       <p>Add a <b>Browser Source</b> (1920×1080) with this URL:</p>
       <div class="copy"><input id="obs-url" readonly><button data-copy="obs-url">Copy</button></div>
-      <p class="muted">Add options with <code>&amp;</code>, e.g. <code>&amp;turn=30&amp;bots=0</code> (list in the README).
+      <p class="muted">The URL updates as you change the options below. After changing options, paste the new URL into the browser source.
         Tick <b>"Control audio via OBS"</b> to get the game sounds in the mixer.</p>
+
+      <div class="opts" id="obs-options">
+        <fieldset>
+          <legend>Start</legend>
+          <label class="field">Open with
+            <select data-opt="game"><option value="">the game browser</option></select></label>
+          <label class="field" id="mode-field" hidden>Mode
+            <select data-opt="mode"><option value="">game's default</option></select></label>
+          <label class="field">After a game
+            <select data-opt="after"><option value="menu">back to the game browser</option><option value="lobby">rematch (same game's lobby)</option></select></label>
+        </fieldset>
+        <fieldset>
+          <legend>Timers (seconds)</legend>
+          <label class="field">Turn <input type="number" min="10" max="300" data-opt="turn"></label>
+          <label class="field">Lobby <input type="number" min="10" max="600" data-opt="lobby"></label>
+          <label class="field">Game vote <input type="number" min="5" max="120" data-opt="vote"></label>
+        </fieldset>
+        <fieldset>
+          <legend>Gameplay</legend>
+          <label class="row"><input type="checkbox" data-opt="bots"> Bots fill empty seats</label>
+          <label class="row"><input type="checkbox" data-opt="predictions"> Twitch predictions</label>
+          <label class="row"><input type="checkbox" data-opt="stats"> Viewer stats &amp; leaderboard</label>
+          <label class="field">Command prefix <input data-opt="prefix" maxlength="3" class="short"></label>
+        </fieldset>
+        <fieldset>
+          <legend>Sound &amp; display</legend>
+          <label class="field">Volume <span class="muted" id="volume-label"></span>
+            <input type="range" min="0" max="1" step="0.05" data-opt="volume"></label>
+          <label class="row"><input type="checkbox" data-opt="mute"> Mute</label>
+          <label class="field">Frame rate cap
+            <select data-opt="fps"><option value="60">60 fps</option><option value="30">30 fps (lighter)</option></select></label>
+        </fieldset>
+      </div>
+      <div class="actions"><button id="reset-options">Reset to defaults</button><span id="options-msg" class="muted"></span></div>
       <p><a id="preview" target="_blank" rel="noopener">Open a preview in this browser</a> <span class="muted">(dark background; chat from Twitch works here too)</span></p>
     </section>
 

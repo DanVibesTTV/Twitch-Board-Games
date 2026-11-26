@@ -4,7 +4,7 @@
 //   index.html?bridge=lumia&token=XXXX                 → Lumia Stream
 //   index.html?bridge=streamerbot&port=8080            → Streamer.bot
 //   http://127.0.0.1:8765/?bridge=node                 → companion app (node app/companion.mjs)
-// Optional: game=ludo (skip the browser), turn=30, lobby=45, vote=15, bots=0,
+// Optional: game=ludo (skip the browser), mode=duel (with game=), turn=30, lobby=45, vote=15, bots=0,
 //           predictions=0, prefix=!, after=lobby (rematch instead of game select), preview=1 (dark background), fps=60,
 //           volume=0.8 (0–1), mute=1, stats=0 (no viewer stats)
 
@@ -66,7 +66,7 @@ async function main() {
   });
 
   await bridge.connect();
-  if (q.get('game')) session.openLobby(q.get('game'));
+  if (q.get('game')) session.openLobby(q.get('game'), q.get('mode') || null);
 
   // handy for debugging from the browser console
   Object.assign(window, { session, bridge, stage });
