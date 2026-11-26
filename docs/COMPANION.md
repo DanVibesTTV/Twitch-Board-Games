@@ -16,6 +16,16 @@ Permissions requested: `user:read:chat` (read chat), `user:write:chat` (send gam
 
 The token is stored in `auth.json` in the data folder and refreshed automatically. **Log out** in the panel deletes it and revokes it at Twitch.
 
+### Bot account (optional)
+By default the game's chat messages come from the streamer's account. To have them come from a bot account instead, click **Connect bot account** in the panel (after logging in with your streaming account):
+
+1. **Copy the link into a private/incognito window.** twitch.tv/activate uses whichever account is logged in, and in your normal browser that's usually you.
+2. Log in there with the bot account and confirm the code.
+
+The bot only gets `user:write:chat`. Chat is still read and predictions still run through the streamer's account. Make the bot a moderator (`/mod botname`) so slow mode, follower-only mode or link filters don't block it. If the bot can't post (banned, timed out, restricted), the message goes out from the streamer's account instead and the panel shows why. The bot's login is stored in `auth-bot.json`; **Disconnect bot** deletes it.
+
+If you accidentally confirm the code with your streaming account, the app notices and asks you to try again in a private window.
+
 ### The Twitch app (client ID)
 Logging in needs the client ID of an app registered at Twitch. This repo's app is **Stream Board Games - companion app**; its client ID is in `app/twitch-app.json` and shared by everyone using this repo (client IDs are not secret). That's the name streamers see on the Twitch login screen.
 
@@ -36,6 +46,7 @@ Override it with the `BOARDGAMES_DATA` environment variable.
 - `data.json`: what the overlay saves (viewer stats etc.)
 - `settings.json`: panel settings
 - `auth.json`: Twitch login. **Keep it private.**
+- `auth-bot.json`: the bot account's login, if connected. **Keep it private.**
 - `backups/`: `data-YYYY-MM-DD.json` once a day (last 14), and `data-before-vX.json` before each update (last 5). To restore, close the app and copy a backup over `data.json`.
 - `installed-files.json`: which files the last update installed (used to remove files a later release deletes)
 

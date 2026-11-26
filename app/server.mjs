@@ -39,6 +39,10 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   const send = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   const broadcast = (event, data) => { for (const res of clients) send(res, event, data); };
   twitch.on('chat', (msg) => broadcast('chat', msg));
+  twitch.on('botState', (st) => {
+    broadcast('twitchBot', st);
+    console.log(`[twitch] bot account: ${st.state === 'none' ? 'not connected' : st.state}${st.login ? ` (${st.login})` : ''}${st.detail ? `: ${st.detail}` : ''}`);
+  });
   twitch.on('state', (st) => {
     broadcast('twitch', st);
     console.log(`[twitch] ${st.state}${st.detail ? `: ${st.detail}` : ''}`);
@@ -67,6 +71,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       res.write('retry: 2000\n\n');
       send(res, 'hello', { version: pkg.version });
       send(res, 'twitch', twitch.state);
+      send(res, 'twitchBot', twitch.botState);
       clients.add(res);
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -80,7 +85,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
     if (req.method === 'GET' && path === '/api/status') {
       return json(res, 200, {
         version: pkg.version, port, dataDir: store.dir,
-        twitch: twitch.state, clientIdSource: settings.twitchClientId ? 'settings' : appInfo.clientId ? 'app' : 'none',
+        twitch: twitch.state, twitchBot: twitch.botState, clientIdSource: settings.twitchClientId ? 'settings' : appInfo.clientId ? 'app' : 'none',
         update: await updater.status(),
         settings: { autoCheck: settings.autoCheck !== false, openPanel: settings.openPanel !== false, updateRepo: updater.repo, twitchClientId: settings.twitchClientId ?? '', obsOptions: settings.obsOptions ?? {} },
       });
@@ -98,6 +103,8 @@ export async function startServer({ port: portArg, openPanel } = {}) {
     if (req.method === 'POST' && path === '/api/prediction') return json(res, 200, await twitch.predict(body.action, body));
     if (req.method === 'POST' && path === '/api/twitch/login') return json(res, 200, await twitch.login());
     if (req.method === 'POST' && path === '/api/twitch/logout') { await twitch.logout(); return json(res, 200, { ok: true }); }
+    if (req.method === 'POST' && path === '/api/twitch/bot/login') return json(res, 200, await twitch.loginBot());
+    if (req.method === 'POST' && path === '/api/twitch/bot/logout') { await twitch.logoutBot(); return json(res, 200, { ok: true }); }
     // updates
     if (req.method === 'POST' && path === '/api/update/check') return json(res, 200, await updater.check());
     if (req.method === 'POST' && path === '/api/update/install') {

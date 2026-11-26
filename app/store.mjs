@@ -6,6 +6,7 @@
 //
 //   settings.json   app settings (port, Twitch client ID override, update checks)
 //   auth.json       Twitch login tokens: keep this file private
+//   auth-bot.json   optional bot account login (same: keep private)
 //   data.json       what the overlay saves: viewer stats, trivia categories and question cache
 //   backups/        copies of data.json (one per day, and one before every update)
 
@@ -37,6 +38,7 @@ export class Store {
     this.files = {
       settings: join(dir, 'settings.json'),
       auth: join(dir, 'auth.json'),
+      authBot: join(dir, 'auth-bot.json'),
       data: join(dir, 'data.json'),
       backups: join(dir, 'backups'),
     };
@@ -76,8 +78,10 @@ export class Store {
     return this.settings;
   }
 
-  loadAuth() { return readJson(this.files.auth, null); }
-  saveAuth(auth) { return auth ? writeJson(this.files.auth, auth) : rm(this.files.auth, { force: true }); }
+  // kind: 'main' (the streamer) or 'bot'
+  #authFile(kind) { return kind === 'bot' ? this.files.authBot : this.files.auth; }
+  loadAuth(kind = 'main') { return readJson(this.#authFile(kind), null); }
+  saveAuth(auth, kind = 'main') { return auth ? writeJson(this.#authFile(kind), auth) : rm(this.#authFile(kind), { force: true }); }
 
   // ---- backups: data-YYYY-MM-DD.json once a day (keeps 14), plus data-before-vX.json before updates (keeps 5) ----
   async backup(kind, label = '') {

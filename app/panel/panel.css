@@ -63,3 +63,6 @@ input[type=number], input.short { max-width: 120px; display: block; }
 input[type=range] { width: 100%; accent-color: var(--accent); margin-top: 6px; }
 input[type=checkbox] { accent-color: var(--accent); width: 16px; height: 16px; }
 [hidden] { display: none !important; }
+#bot-body:not(:empty) { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+h3 { font-size: 14px; margin: 0 0 8px; color: var(--text); }
+h3 .muted { font-weight: 400; }
