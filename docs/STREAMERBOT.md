@@ -1,8 +1,6 @@
 # Streamer.bot setup
 
-The overlay connects to Streamer.bot's WebSocket server. It reads chat from the `Twitch.ChatMessage` event and runs **two actions** for everything it sends out: chat messages, whispers and predictions.
-
-> **One-click import:** once `streamerbot/BoardGames.import.txt` exists in this repo, paste its contents into Streamer.bot → **Import** and skip step 2. Until then, set it up by hand (about 5 minutes, once).
+The overlay connects to Streamer.bot's WebSocket server. It reads chat from the `Twitch.ChatMessage` event and runs **two actions** for everything it sends out: chat messages, whispers and predictions. Setup takes about 2 minutes: turn on the WebSocket server and import one file.
 
 ## 1. Enable the WebSocket server
 Streamer.bot → **Servers/Clients → WebSocket Server**:
@@ -12,26 +10,28 @@ Streamer.bot → **Servers/Clients → WebSocket Server**:
 
 Overlay URL: `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=streamerbot` (add `&port=…` if you changed the port).
 
-## 2. Create the two actions
-Action names must match **exactly**, including the `·` (middle dot). Copy them from here.
-
-### Action 1: `BoardGames · Bridge`
-Handles chat messages, whispers, and creating, locking and cancelling predictions.
-1. **Actions** tab → right-click → **Add**. Name: `BoardGames · Bridge`, Group: `BoardGames`. Leave everything else at the defaults. No trigger is needed.
-2. In the Sub-Actions panel, right-click → **Core → C# → Execute C# Code**.
-3. Delete the example code and paste the entire contents of [`streamerbot/BoardGamesBridge.cs`](../streamerbot/BoardGamesBridge.cs).
-4. Click **Compile**. The log at the bottom should say *Compiled successfully*. Then click **Save and Compile**.
-
-### Action 2: `BoardGames · Resolve`
-Pays out the prediction to whoever bet on the winner.
-1. Add another action, named `BoardGames · Resolve`, Group: `BoardGames`. No trigger.
-2. Sub-Actions → right-click → **Twitch → Predictions → Resolve Last Prediction**.
-3. In the index field, enter `%winnerIndex0%`. This is the zero-based number of the winning outcome, which the overlay sends.
+## 2. Import the actions (one click)
+1. Download [`streamerbot/BoardGames.sb`](../streamerbot/BoardGames.sb). On GitHub, open the file and click the **Download raw file** button.
+2. In Streamer.bot, click **Import** at the top.
+3. Drag the `.sb` file into the **Import String** field, or open it in a text editor and paste its contents there.
+4. Check that you see **BoardGames** with 2 actions, then click **Import**.
+5. Open the action `BoardGames · Bridge`, double-click the *Execute C# Code* sub-action and click **Compile** once. The log should say *Compiled successfully*. Then **Save and Compile**.
 
 That's it. Start a game with at least 2 human players and a prediction opens with every seat as an outcome. It resolves for the winner, or is cancelled (points refunded) if a mod types `!bg stop`.
 
-## 3. Share it (export)
-Once both actions work, select them in the Actions list → right-click → **Export**, and copy the export string. Saved as `streamerbot/BoardGames.import.txt` in this repo, it lets other streamers skip step 2.
+The pack contains only these two actions: no commands, timers or triggers, and nothing that changes your existing setup.
+
+### Manual setup (if the import doesn't work)
+**`BoardGames · Bridge`** handles chat messages, whispers, and creating, locking and cancelling predictions.
+1. **Actions** tab → right-click → **Add**. Name: `BoardGames · Bridge` (exactly, including the `·`). No trigger.
+2. Sub-Actions → right-click → **Core → C# → Execute C# Code**. Replace the example code with [`streamerbot/BoardGamesBridge.cs`](../streamerbot/BoardGamesBridge.cs) → **Compile** → **Save and Compile**.
+
+**`BoardGames · Resolve`** pays out the prediction.
+1. Add an action named `BoardGames · Resolve`. No trigger.
+2. Sub-Actions → right-click → **Twitch → Predictions → Resolve Last Prediction**, index `%winnerIndex0%`.
+
+### Updating the pack
+If `BoardGamesBridge.cs` changes, re-import the new `.sb`, or paste the new C# into the existing sub-action. To make a new export: select both actions → right-click → **Export**.
 
 ## What the overlay sends
 
@@ -52,5 +52,5 @@ All arguments are strings. The prediction id is kept in the non-persisted global
 ## Troubleshooting
 - **The overlay shows "is the Streamer.bot WebSocket server started?"**: check step 1, and that nothing else uses port 8080.
 - **The overlay shows "authentication is on"**: turn off WebSocket authentication.
-- **No chat messages or predictions**: open Streamer.bot's **Action History**. If the actions don't appear there, the names don't match exactly. If they appear with errors, check the log.
+- **No chat messages or predictions**: open Streamer.bot's **Action History**. If the actions don't appear there, they weren't imported or the names don't match exactly. If they appear with errors, check the log and recompile the C# sub-action.
 - **The prediction isn't resolved**: check that `BoardGames · Resolve` uses `%winnerIndex0%`, not `%winnerIndex%`.
