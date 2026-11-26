@@ -23,7 +23,43 @@ Paste that URL plus the settings below into an OBS Browser Source. Every push to
   ```bash
   node tools/serve.mjs
   ```
-  Then use `http://127.0.0.1:8765/` instead of the GitHub URL. ES modules don't load from `file://`, so the folder has to be served over http.
+  Then use `http://127.0.0.1:8765/` instead of the GitHub URL. ES modules don't load from `file://`, so the folder has to be served over http. This needs **Node.js** installed (see below).
+
+### Installing Node.js (only needed to run it locally)
+You only need Node.js for the `node` command above (and for `npm test` if you work on the code). The hosted URL and GitHub Pages forks need nothing installed.
+
+Any version from **18** up works; just pick the current **LTS** ("Long Term Support") release.
+
+**Windows**
+1. Go to **https://nodejs.org**, download the **LTS** Windows Installer (`.msi`) and run it. Clicking *Next* through the default options is fine.
+   *Or*, in a terminal: `winget install -e --id OpenJS.NodeJS.LTS`
+2. **Close and reopen** any terminal windows so the `node` command is found.
+
+**macOS**
+1. Download the **LTS** macOS Installer (`.pkg`) from **https://nodejs.org** and run it.
+   *Or*, with Homebrew: `brew install node`
+
+**Linux**
+Use your distro's package manager or the instructions on https://nodejs.org/en/download.
+
+**Check it worked:** open a new terminal and run
+```bash
+node -v
+```
+It should print a version like `v22.x.x` or higher.
+
+**Start the overlay:**
+1. Download this repo (green **Code** button → **Download ZIP**, then extract it) or clone it.
+2. Open a terminal **in that folder**:
+   - Windows: open the folder in Explorer, click the address bar, type `cmd` and press Enter (or right-click an empty spot → *Open in Terminal*).
+   - macOS: right-click the folder in Finder → *New Terminal at Folder*.
+3. Run `node tools/serve.mjs` (or `npm start`). It prints `Board games overlay: http://127.0.0.1:8765/?bridge=dev`; open that in a browser to test, and use `http://127.0.0.1:8765/` in OBS.
+4. **Leave that window open** while you stream; closing it stops the overlay. Press `Ctrl+C` to stop it.
+
+**Troubleshooting**
+- *"'node' is not recognized"* / *"command not found: node"*: the terminal was opened before Node.js was installed. Close it and open a new one (restart the PC if it still fails).
+- *"Cannot find module …tools/serve.mjs"*: the terminal isn't in the repo folder. Check that the folder you opened contains `index.html` and a `tools` folder.
+- *"EADDRINUSE"*: the server is already running in another window (or another app uses port 8765). Close the other window, or pick another port: `node tools/serve.mjs 8766` (then use that port in the URL).
 
 ### Try it without Twitch
 Open the overlay URL with `?bridge=dev` in a normal browser. Use the box at the bottom to chat as anyone:
