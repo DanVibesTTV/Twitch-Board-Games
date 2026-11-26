@@ -1,4 +1,5 @@
 {
   "//": "Client ID of the Twitch app used for logging in (registered at dev.twitch.tv as a Public client). Client IDs aren't secret. Streamers can override it in the control panel.",
-  "clientId": ""
+  "clientId": "v3evsfh6vk0aho5s7ipun9y7vx160w",
+  "name": "Stream Board Games - companion app"
 }

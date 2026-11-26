@@ -17,11 +17,11 @@ Permissions requested: `user:read:chat` (read chat), `user:write:chat` (send gam
 The token is stored in `auth.json` in the data folder and refreshed automatically. **Log out** in the panel deletes it and revokes it at Twitch.
 
 ### The Twitch app (client ID)
-Logging in needs the client ID of an app registered at Twitch. It's set once in `app/twitch-app.json` and shared by everyone using this repo. Client IDs are not secret.
+Logging in needs the client ID of an app registered at Twitch. This repo's app is **Stream Board Games - companion app**; its client ID is in `app/twitch-app.json` and shared by everyone using this repo (client IDs are not secret). That's the name streamers see on the Twitch login screen.
 
 To register one (repo owner, or anyone who wants their own):
 1. Go to https://dev.twitch.tv/console/apps → **Register Your Application**.
-2. Name: e.g. `Twitch Board Games`. OAuth Redirect URL: `http://localhost` (required by the form, not used). Category: *Game Integration*. **Client Type: Public**.
+2. Name: e.g. `Stream Board Games - companion app` (Twitch doesn't allow "Twitch" in app names). OAuth Redirect URL: `http://localhost` (required by the form, not used). Category: *Game Integration*. **Client Type: Public**.
 3. Copy the **Client ID** into `app/twitch-app.json` (repo) or the panel's **Settings → Twitch client ID** (just your PC).
 
 ## Where things are saved
