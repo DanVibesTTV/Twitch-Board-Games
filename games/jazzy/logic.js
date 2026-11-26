@@ -222,7 +222,7 @@ export function createGame({ seats, rng, rules: r = {} }) {
       for (let mask = 0; mask < 32; mask++) options.push({ label: `keep ${mask}`, hidden: true, data: { keep: mask } });
       return {
         seat: s, kind: 'hold', layout: 'list',
-        prompt: `Roll ${4 - state.rollsLeft}/3: ${diceText()}. Hold dice, roll again or score (!keep 135 = hold dice 1, 3, 5 and roll)`,
+        prompt: `Roll ${3 - state.rollsLeft}/3: ${diceText()}. Hold dice, roll again or score (!keep 135 = hold dice 1, 3, 5 and roll)`,
         options,
       };
     }
