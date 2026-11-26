@@ -194,7 +194,7 @@ export class Hud {
         <ol>${ranking.map((s, i) => `<li><span>${medals[i] ?? `${i + 1}.`}</span>${esc(labelOf(s))}</li>`).join('')}</ol>
       </div>`;
     this.banner.classList.add('show');
-    this.main.innerHTML = '<div class="muted">Rematch lobby opens shortly…</div>';
+    this.main.innerHTML = `<div class="muted">${this.s.config.afterGame === 'lobby' ? 'Rematch lobby opens shortly…' : 'Back to game select shortly…'}</div>`;
   }
 }
 

@@ -24,8 +24,8 @@ export const DEFAULT_CONFIG = {
   minHumans: 1,
   predictions: true,
   predictionSeconds: 60,
-  overSeconds: 15,         // winner screen, then rematch lobby
-  afterGame: 'lobby',      // 'lobby' (rematch) or 'menu'
+  overSeconds: 15,         // how long the winner screen shows before moving on
+  afterGame: 'menu',       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
 };
 
 export class Session extends Emitter {
