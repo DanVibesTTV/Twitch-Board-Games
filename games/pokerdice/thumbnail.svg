@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7a4a24"/><stop offset="1" stop-color="#4a2a12"/></linearGradient>
+    <radialGradient id="bone" cx=".4" cy=".35" r=".8"><stop offset="0" stop-color="#f6eed8"/><stop offset="1" stop-color="#c9b88e"/></radialGradient>
+    <radialGradient id="gold" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#fff0a0"/><stop offset="1" stop-color="#b8820f"/></radialGradient>
+  </defs>
+  <rect width="150" height="150" rx="12" fill="#1b120a"/>
+  <path d="M8 8 H104 L112 14 L118 9 L126 18 L134 15 L142 26 V142 H48 L42 136 L36 142 H8 Z" fill="url(#wood)"/>
+  <g stroke="#2a1608" stroke-width="2" opacity=".7"><path d="M8 37 H142 M8 66 H142 M8 95 H142 M8 124 H142"/></g>
+  <path d="M60 48 L72 60 L66 74" stroke="#1a0c04" stroke-width="2" fill="none"/>
+  <g fill="#2a2420"><circle cx="18" cy="20" r="2.2"/><circle cx="132" cy="50" r="2.2"/><circle cx="18" cy="108" r="2.2"/></g>
+  <g transform="translate(52 88) rotate(-12)">
+    <rect x="-22" y="-22" width="44" height="44" rx="10" fill="url(#bone)" stroke="#8a7a58"/>
+    <text x="0" y="13" text-anchor="middle" font-family="Georgia, serif" font-weight="700" font-size="34" fill="#7d1a10">K</text>
+  </g>
+  <g transform="translate(100 82) rotate(10)">
+    <rect x="-22" y="-22" width="44" height="44" rx="10" fill="url(#bone)" stroke="#8a7a58"/>
+    <g fill="#2a1608">
+      <ellipse cx="0" cy="-5" rx="11" ry="10"/><rect x="-6.5" y="1" width="13" height="8"/>
+      <path d="M-14 6 L14 16 M14 6 L-14 16" stroke="#2a1608" stroke-width="3.2" stroke-linecap="round"/>
+    </g>
+    <g fill="#e9dfc4"><ellipse cx="-4.5" cy="-5" rx="3" ry="3.4"/><ellipse cx="4.5" cy="-5" rx="3" ry="3.4"/></g>
+  </g>
+  <circle cx="122" cy="122" r="12" fill="url(#gold)" stroke="#7a5208" stroke-width="1.5"/>
+  <circle cx="106" cy="128" r="10" fill="url(#gold)" stroke="#7a5208" stroke-width="1.5"/>
+  <text x="75" y="34" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-weight="700" font-size="18" fill="#f3e2b3">Poker Dice</text>
+</svg>

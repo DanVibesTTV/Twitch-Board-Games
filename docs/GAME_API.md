@@ -87,10 +87,11 @@ Rendering is on demand: the loop only runs during `stage.animate()` calls or aft
 
 Shared helpers:
 - `renderer/unfold.js`: folding board intro (square or rectangular via `size`/`depth`, `edgeColor`).
-- `renderer/dice.js`: rounded die that lands on a given value and plays the dice sound (`roll(v, { sound: false })` when several dice roll together and you play one rattle). Style it with `faceColor`, `pipColor`, `onePipColor`, `glow`.
+- `renderer/dice.js`: rounded die that lands on a given value and plays the dice sound (`roll(v, { sound: false })` when several dice roll together and you play one rattle). Style it with `faceColor`, `pipColor`, `onePipColor`, `glow`, or paint your own faces with `drawFace(ctx, value, px)` (Poker Dice); `upright: true` lands so letters on the top face read upright; `roughness`, `radius` tune the look.
+- `renderer/dicerow.js` + `core/dice.js`: everything for "five dice, three rolls, hold what you like" games. `DiceRow` animates rolls, holding and the 1–5 badges; `core/dice.js` builds the hold step (`holdOptions`, `applyHold`, `keepCommand` for `!keep 135`, `rollDice`) and plans bot moves exactly (`bestKeep(dice, rollsLeft, valueOfHand)`). See Jazzy Dice and Poker Dice.
 - `renderer/pieces.js`: lathe pawn and blob shadow.
 - `renderer/stage.js`: `blobShadow`, `badgeSprite`, easing.
-- `stage.sfx.play(name, opts)`: shared sounds, `dice` (`{ dice: n }` for several at once), `step`, `punch`, `whoosh`, `zap`, `teleport`, `slide`, `win`, `clack`, `correct`, `wrong`, `wedge`, `jazz` (`{ big, pitch }`) (see `renderer/audio.js`; add new synths to `SYNTHS` and a level to `LEVELS`).
+- `stage.sfx.play(name, opts)`: shared sounds, `dice` (`{ dice: n }` for several at once), `step`, `punch`, `whoosh`, `zap`, `teleport`, `slide`, `win`, `clack`, `correct`, `wrong`, `wedge`, `jazz` (`{ big, pitch }`), `coin`, `thud` (see `renderer/audio.js`; add new synths to `SYNTHS` and a level to `LEVELS`).
 
 ## Testing
 

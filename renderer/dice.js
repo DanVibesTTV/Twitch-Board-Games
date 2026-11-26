@@ -12,6 +12,12 @@ const FACE_NORMALS = [
   new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, -1, 0),
   new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, 0, -1),
 ];
+// Which way is "up" in each face's texture (BoxGeometry UVs), for dice that land readable.
+const FACE_UPS = [
+  new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0),
+  new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1),
+  new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 0),
+];
 const PIPS = {
   1: [[0, 0]],
   2: [[-1, -1], [1, 1]],
@@ -41,19 +47,35 @@ function faceTexture(value, pipColor, faceColor, onePipColor) {
   return tex;
 }
 
+// A face painted by the game: drawFace(ctx2d, value, px) fills the whole px×px square.
+function customFaceTexture(value, drawFace) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 256;
+  drawFace(cv.getContext('2d'), value, 256);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  return tex;
+}
+
 export class Die {
   // Options: faceColor/pipColor/onePipColor; glow: true draws glowing pips (neon style).
-  constructor(stage, { size = 0.9, pipColor = '#1d1a26', faceColor = '#fbf8f1', onePipColor = '#d3313a', glow = false } = {}) {
+  // drawFace(ctx, value, px): paint your own faces instead of pips (e.g. Poker Dice's 9–A);
+  // roughness and radius (corner rounding, fraction of the size) tune the material and shape.
+  // upright: land with the top face readable from the camera (letters/numbers), give or take `jitter` radians.
+  constructor(stage, { size = 0.9, pipColor = '#1d1a26', faceColor = '#fbf8f1', onePipColor = '#d3313a', glow = false, drawFace = null, roughness = 0.45, radius = 0.16, upright = false, jitter = 0.25 } = {}) {
     this.stage = stage;
     this.size = size;
+    this.upright = upright;
+    this.jitter = jitter;
     glowPips = glow;
     const mats = FACE_VALUES.map((v) => new THREE.MeshStandardMaterial({
-      map: faceTexture(v, pipColor, faceColor, onePipColor),
-      roughness: 0.45,
-      ...(glow ? { emissive: 0xffffff, emissiveMap: faceTexture(v, pipColor, '#000000', onePipColor), emissiveIntensity: 0.9 } : {}),
+      map: drawFace ? customFaceTexture(v, drawFace) : faceTexture(v, pipColor, faceColor, onePipColor),
+      roughness,
+      ...(glow && !drawFace ? { emissive: 0xffffff, emissiveMap: faceTexture(v, pipColor, '#000000', onePipColor), emissiveIntensity: 0.9 } : {}),
     }));
     glowPips = false;
-    this.mesh = new THREE.Mesh(new RoundedBoxGeometry(size, size, size, 3, size * 0.16), mats);
+    this.mesh = new THREE.Mesh(new RoundedBoxGeometry(size, size, size, 3, size * radius), mats);
     this.shadow = blobShadow(size * 0.85);
     this.group = new THREE.Group();
     this.group.add(this.mesh, this.shadow);
@@ -78,7 +100,13 @@ export class Die {
   #targetFor(value) {
     const i = FACE_VALUES.indexOf(value);
     const q = new THREE.Quaternion().setFromUnitVectors(FACE_NORMALS[i], new THREE.Vector3(0, 1, 0));
-    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.random() * Math.PI * 2);
+    let angle = Math.random() * Math.PI * 2;
+    if (this.upright) {
+      // turn so the face's "up" points away from the camera (−z): reads upright on screen
+      const up = FACE_UPS[i].clone().applyQuaternion(q);
+      angle = Math.PI - Math.atan2(up.x, up.z) + (Math.random() - 0.5) * 2 * this.jitter;
+    }
+    const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), angle);
     return yaw.multiply(q);
   }
 

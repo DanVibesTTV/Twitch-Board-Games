@@ -136,7 +136,7 @@ function dieHit(ctx, out, noise, t, strength) {
 }
 
 // Balances the synths against each other (measured peaks), so they sit at similar loudness.
-export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6, correct: 2.1, wrong: 1.6, wedge: 3.6, jazz: 2.6 };
+export const LEVELS = { dice: 3.6, step: 7, punch: 2.4, whoosh: 4.5, zap: 6.5, teleport: 3.4, slide: 1.8, win: 2.8, clack: 4.6, correct: 2.1, wrong: 1.6, wedge: 3.6, jazz: 2.6, coin: 2.4, thud: 3.2 };
 
 export const SYNTHS = {
   // Rattle that follows the 3D die: a big hit at each of the three bounces,
@@ -340,6 +340,22 @@ SYNTHS.jazz = (ctx, out, noise, t, { gain = 1, big = false, pitch = 1 } = {}) =>
       tone(ctx, out, t + 0.3 + i * 0.07, { from: f * pitch, to: f * pitch, dur: i === 5 ? 0.7 : 0.18, gain: 0.07 * gain, type: 'triangle' });
     });
   }
+};
+
+// Poker Dice: a gold coin landing (two bright metallic pings with a short ring).
+SYNTHS.coin = (ctx, out, noise, t, { gain = 1, pitch = 1 } = {}) => {
+  for (const [dt, f] of [[0, 2093], [0.07, 2637]]) {
+    tone(ctx, out, t + dt, { from: f * pitch, to: f * pitch * 0.995, dur: 0.45, gain: 0.12 * gain, type: 'sine' });
+    tone(ctx, out, t + dt, { from: f * 2.76 * pitch, to: f * 2.7 * pitch, dur: 0.2, gain: 0.05 * gain, type: 'sine' });
+    burst(ctx, out, noise, t + dt, { dur: 0.015, freq: 7000, q: 3, gain: 0.15 * gain });
+  }
+};
+
+// A heavy wooden table landing.
+SYNTHS.thud = (ctx, out, noise, t, { gain = 1 } = {}) => {
+  tone(ctx, out, t, { from: 110, to: 45, dur: 0.35, gain: 0.5 * gain, type: 'sine' });
+  burst(ctx, out, noise, t, { dur: 0.12, freq: 380, q: 1.2, gain: 0.5 * gain, type: 'lowpass' });
+  burst(ctx, out, noise, t + 0.02, { dur: 0.05, freq: 1800, q: 2, gain: 0.18 * gain });
 };
 
 function softClip(amount) {

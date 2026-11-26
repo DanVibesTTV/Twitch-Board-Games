@@ -3,8 +3,8 @@
 
 import * as THREE from 'three';
 import { unfoldBoard } from '../../renderer/unfold.js';
-import { Die } from '../../renderer/dice.js';
-import { ease, badgeSprite } from '../../renderer/stage.js';
+import { DiceRow } from '../../renderer/dicerow.js';
+import { ease } from '../../renderer/stage.js';
 import { drawBoard, drawBoardBack, drawRecord, W, D, PX, RECORD, DICE_ROW, HOLD_Z } from './board.js';
 
 const THICK = 0.16;
@@ -31,8 +31,7 @@ export function createRenderer(stage, { seats }) {
 
   let board = null;
   let record = null;
-  const dice = [];
-  const decor = [];
+  let row = null;
 
   const seatInfo = () => seats.map((s) => ({
     color: s.color,
@@ -43,25 +42,6 @@ export function createRenderer(stage, { seats }) {
     drawBoard(canvas, { state: game.state, seats: seatInfo(), decision, flash });
     boardTex.needsUpdate = true;
     stage.invalidate();
-  }
-
-  function clearDecor() {
-    for (const d of decor) d.removeFromParent();
-    decor.length = 0;
-    stage.invalidate();
-  }
-
-  // Slide a die to its spot (row on the record, or the held lane) with a little hop.
-  function moveDie(i, held, ms = 260) {
-    const die = dice[i];
-    const to = held ? holdPos(i) : rowPos(i);
-    const from = die.group.position.clone();
-    if (from.distanceTo(to) < 1e-3) return Promise.resolve();
-    die.rest.copy(to);
-    return stage.animate(ms, (k) => {
-      die.group.position.lerpVectors(from, to, k);
-      die.group.position.y += Math.sin(k * Math.PI) * 0.45;
-    }, ease.inOut);
   }
 
   function spinRecord(ms) {
@@ -91,38 +71,24 @@ export function createRenderer(stage, { seats }) {
         record.scale.setScalar(0.85 + 0.15 * k);
       }, ease.outBack);
 
-      for (let i = 0; i < 5; i++) {
-        const die = new Die(stage, { size: DIE, faceColor: '#fbf6ea', pipColor: '#1d1934', onePipColor: '#c08a22' });
-        const p = rowPos(i);
-        die.place(p.x, p.y, p.z);
-        dice.push(die);
-      }
+      row = new DiceRow(stage, { rowAt: rowPos, holdAt: holdPos, size: DIE, die: { faceColor: '#fbf6ea', pipColor: '#1d1934', onePipColor: '#c08a22' } });
       await spinRecord(700);
     },
 
     async present(events, game) {
-      clearDecor();
+      row.clearBadges();
       for (const e of events) {
         if (e.type === 'roll') {
-          stage.sfx?.play('dice', { duration: 900, dice: Math.min(3, e.rolled.length) });
           const spin = spinRecord(1300);
-          await Promise.all(e.rolled.map((i, k) => stage.wait(k * 45).then(() => {
-            const p = rowPos(i);
-            dice[i].place(p.x, p.y, p.z);
-            const from = new THREE.Vector3((Math.random() - 0.5) * 1.2, 0, 2.6 + Math.random() * 0.8);
-            return dice[i].roll(e.dice[i], { ms: 900 + Math.random() * 150, from, sound: false });
-          })));
+          await row.roll(e);
           await spin;
           redraw(game);
         } else if (e.type === 'jazz') {
           stage.sfx?.play('jazz', { big: true });
-          await Promise.all(dice.map((d, i) => stage.wait(i * 60).then(() => {
-            const base = d.group.position.y;
-            return stage.animate(380, (k) => { d.group.position.y = base + Math.sin(k * Math.PI) * 0.7; }, ease.inOut);
-          })));
+          await row.hop();
         } else if (e.type === 'hold') {
           stage.sfx?.play('clack', { pitch: e.held ? 1.15 : 0.9 });
-          await moveDie(e.die, e.held);
+          await row.setHeld(e.die, e.held);
         } else if (e.type === 'score') {
           redraw(game, { flash: { seat: e.seat, cat: e.cat } });
           if (e.jazzBonus || (e.cat === 11 && e.points === 50)) stage.sfx?.play('jazz', { big: true, pitch: e.jazzBonus ? 1.12 : 1 });
@@ -134,33 +100,22 @@ export function createRenderer(stage, { seats }) {
           await stage.wait(600);
         } else if (e.type === 'turn') {
           // the dice go back onto the record for the next player
-          await Promise.all(dice.map((_, i) => moveDie(i, false, 320)));
+          await row.reset();
         }
       }
       redraw(game, { decision: game.decision() });
     },
 
     showDecision(d, game) {
-      clearDecor();
+      row.clearBadges();
       redraw(game, { decision: d });
-      if (d.kind !== 'hold') return;
-      const color = seats[d.seat].color;
-      for (let i = 0; i < 5; i++) {
-        const badge = badgeSprite(String(i + 1), '#1d1934', color);
-        badge.scale.setScalar(0.5);
-        // The camera looks down almost vertically, so a badge straight above a die covers its face.
-        // Pushing it back (−z) puts it above the die on screen instead.
-        badge.position.set(0, DIE * 0.6, -DIE * 1.05);
-        dice[i].group.add(badge);
-        decor.push(badge);
-      }
+      if (d.kind === 'hold') row.showBadges(seats[d.seat].color);
     },
 
     dispose() {
-      clearDecor();
+      row?.dispose();
       board?.removeFromParent();
       record?.removeFromParent();
-      for (const d of dice) d.group.removeFromParent();
       boardTex.dispose();
       backTex.dispose();
       recordTex.dispose();
