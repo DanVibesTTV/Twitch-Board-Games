@@ -10,6 +10,8 @@ export const ease = {
   outBack: (t) => { const c = 1.6; return 1 + (c + 1) * (t - 1) ** 3 + c * (t - 1) ** 2; },
 };
 
+const DEFAULT_FOV = 34;
+
 export class Stage {
   constructor(container, { fpsCap = 60, maxPixelRatio = 1.5, antialias = true } = {}) {
     this.container = container;
@@ -20,7 +22,7 @@ export class Stage {
     container.appendChild(this.renderer.domElement);
 
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.5, 200);
+    this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 16 / 9, 0.5, 200);
     this.target = new THREE.Vector3();
 
     this.scene.add(new THREE.HemisphereLight(0xfff6ea, 0x40342a, 1.6));
@@ -41,6 +43,9 @@ export class Stage {
 
   // Positions the camera so a square board of `size` fits, viewed at `tilt` degrees from vertical.
   frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0] } = {}) {
+    this.viewArgs = null;
+    this.camera.fov = DEFAULT_FOV;
+    this.#applyShift(0);
     const vfov = THREE.MathUtils.degToRad(this.camera.fov);
     const aspect = this.camera.aspect;
     // Fit the board's diagonal-ish footprint in whichever dimension is tighter.
@@ -57,15 +62,47 @@ export class Stage {
     this.invalidate();
   }
 
+  // Frames an upright object (width x height around `center`) from the front, e.g. a standing board.
+  // elevation: degrees above horizontal. shiftX: moves the picture sideways as a fraction of the
+  // screen width (negative = left) with a lens shift, so the camera still looks straight on and
+  // nothing gets viewed at an angle. A narrow fov keeps perspective distortion low.
+  view({ width, height, center = [0, 0, 0], fov = 24, elevation = 6, fill = 0.9, shiftX = 0 }) {
+    this.frameArgs = null;
+    this.viewArgs = { width, height, center, fov, elevation, fill, shiftX };
+    this.camera.fov = fov;
+    const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
+    const usableW = 1 - 2 * Math.abs(shiftX);
+    const distH = height / fill / 2 / t;
+    const distW = width / fill / 2 / (t * this.camera.aspect * usableW);
+    const dist = Math.max(distH, distW);
+    const e = THREE.MathUtils.degToRad(elevation);
+    this.target.set(...center);
+    this.camera.position.set(center[0], center[1] + Math.sin(e) * dist, center[2] + Math.cos(e) * dist);
+    this.camera.lookAt(this.target);
+    this.#applyShift(shiftX);
+    this.invalidate();
+  }
+
+  #applyShift(shiftX) {
+    const w = this.width ?? window.innerWidth;
+    const h = this.height ?? window.innerHeight;
+    if (shiftX) this.camera.setViewOffset(w, h, -shiftX * w, 0, w, h);
+    else this.camera.clearViewOffset();
+    this.camera.updateProjectionMatrix();
+  }
+
   resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
+    this.width = w;
+    this.height = h;
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
     if (this.frameArgs) this.frame(...this.frameArgs);
+    else if (this.viewArgs) this.view(this.viewArgs);
     this.invalidate();
   }
 

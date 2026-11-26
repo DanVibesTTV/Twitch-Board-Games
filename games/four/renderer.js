@@ -11,8 +11,8 @@ const H = ROWS * CELL + 0.7;
 const BASE = 0.3;                 // frame sits on its feet this high
 const HOLE_R = 0.4;
 const DISC_R = 0.44;
-const DISC_T = 0.28;
-const PLATE_Z = 0.2;
+const DISC_T = 0.2;
+const PLATE_Z = 0.14; // plates close together, so you never look through a hole onto the back plate
 const FRAME_COLOR = '#1f4fd1';
 
 const holeX = (c) => (c - (COLS - 1) / 2) * CELL;
@@ -122,14 +122,24 @@ export function createRenderer(stage, { seats }) {
   const labelTex = new THREE.CanvasTexture(labelCanvas);
   labelTex.colorSpace = THREE.SRGBColorSpace;
 
+  // Front key light just for this upright board (the shared lights mostly hit from above).
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
+  keyLight.position.set(-4, 7, 12);
+  const fillLight = new THREE.DirectionalLight(0xbfd4ff, 0.45);
+  fillLight.position.set(6, 2, 8);
+
   function buildFrame() {
-    const plateMat = new THREE.MeshStandardMaterial({ map: frameTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.45 });
     const plateGeo = new THREE.PlaneGeometry(W, H);
-    for (const z of [PLATE_Z, -PLATE_Z]) {
-      const plate = new THREE.Mesh(plateGeo, plateMat);
-      plate.position.set(0, BASE + H / 2, z);
-      group.add(plate);
-    }
+    const front = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
+      map: frameTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.32, metalness: 0.05,
+    }));
+    front.position.set(0, BASE + H / 2, PLATE_Z);
+    // The back plate is only seen through the holes: darker, so it reads as the inside of the frame.
+    const back = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
+      map: frameTex, color: 0x4a5a90, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6,
+    }));
+    back.position.set(0, BASE + H / 2, -PLATE_Z);
+    group.add(front, back);
     const edgeMat = new THREE.MeshStandardMaterial({ color: FRAME_COLOR, roughness: 0.5 });
     const side = new THREE.BoxGeometry(0.14, H, PLATE_Z * 2 + 0.04);
     for (const x of [-W / 2, W / 2]) {
@@ -203,7 +213,9 @@ export function createRenderer(stage, { seats }) {
 
   return {
     async intro() {
-      stage.frame(9, { tilt: 70, fill: 0.95, center: [1.9, BASE + H / 2 + 0.2, 0] });
+      const height = TOP + 0.95; // feet to the top of the column numbers
+      stage.view({ width: W + 1, height, center: [0, height / 2, 0], fov: 24, elevation: 5, fill: 0.86, shiftX: -0.15 });
+      stage.scene.add(keyLight, fillLight);
       buildFrame();
       group.rotation.x = -Math.PI / 2; // lying flat behind the hinge
       stage.scene.add(group);
@@ -231,6 +243,8 @@ export function createRenderer(stage, { seats }) {
 
     dispose() {
       group.removeFromParent();
+      keyLight.removeFromParent();
+      fillLight.removeFromParent();
       discGeo.dispose();
       frameTex.dispose();
       labelTex.dispose();
