@@ -2,13 +2,14 @@ import { AnonIrcBridge } from './irc-anon.js';
 import { LumiaBridge } from './lumia.js';
 import { StreamerBotBridge } from './streamerbot.js';
 import { DevBridge } from './dev.js';
+import { NodeBridge } from './node.js';
 
 export const BRIDGES = {
   irc: AnonIrcBridge,
   lumia: LumiaBridge,
   streamerbot: StreamerBotBridge,
   dev: DevBridge,
-  // node: NodeBridge — local companion app, planned
+  node: NodeBridge,
 };
 
 export function createBridge(kind, options) {

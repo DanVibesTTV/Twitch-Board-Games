@@ -2,8 +2,10 @@
 //
 // - Rate limit: one request per IP every 5 seconds → all requests go through one queue.
 // - A session token avoids repeat questions (tokens expire after 6 h of inactivity).
-// - Unused questions are cached in localStorage, so the next game starts instantly.
+// - Unused questions are cached (core/storage.js: localStorage or the companion app's file), so the next game starts instantly.
 // - If the API can't be reached, a small built-in question set keeps the game going.
+
+import { storage as defaultStorage } from '../../core/storage.js';
 
 const API = 'https://opentdb.com';
 const SPACING_MS = 5300;     // a bit more than the 5 s rate limit
@@ -50,7 +52,7 @@ const decode = (s) => {
 };
 
 export class QuestionBank {
-  constructor({ fetch = globalThis.fetch?.bind(globalThis), storage = safeStorage(), now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  constructor({ fetch = globalThis.fetch?.bind(globalThis), storage = defaultStorage, now = () => Date.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
     this.fetch = fetch;
     this.storage = storage;
     this.now = now;
@@ -227,10 +229,6 @@ export class QuestionBank {
   #write(key, value) {
     try { this.storage?.setItem(key, JSON.stringify(value)); } catch { /* storage full or blocked */ }
   }
-}
-
-function safeStorage() {
-  try { return globalThis.localStorage ?? null; } catch { return null; }
 }
 
 // ───────────── built-in questions (used only when the API can't deliver) ─────────────

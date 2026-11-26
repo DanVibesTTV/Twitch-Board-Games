@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Twitch Board Games · Companion</title>
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header>
+    <h1>Twitch Board Games <span class="sub">companion</span></h1>
+    <span id="version" class="pill"></span>
+  </header>
+
+  <main>
+    <section class="card" id="twitch">
+      <h2>Twitch</h2>
+      <div id="twitch-body">Loading…</div>
+    </section>
+
+    <section class="card">
+      <h2>OBS</h2>
+      <p>Add a <b>Browser Source</b> (1920×1080) with this URL:</p>
+      <div class="copy"><input id="obs-url" readonly><button data-copy="obs-url">Copy</button></div>
+      <p class="muted">Add options with <code>&amp;</code>, e.g. <code>&amp;turn=30&amp;bots=0</code> (list in the README).
+        Tick <b>"Control audio via OBS"</b> to get the game sounds in the mixer.</p>
+      <p><a id="preview" target="_blank" rel="noopener">Open a preview in this browser</a> <span class="muted">(dark background; chat from Twitch works here too)</span></p>
+    </section>
+
+    <section class="card" id="updates">
+      <h2>Updates</h2>
+      <div id="update-body">Checking…</div>
+    </section>
+
+    <section class="card">
+      <h2>Your data</h2>
+      <p>Viewer stats, trivia categories and your Twitch login are saved here, outside the program folder, so updates never touch them:</p>
+      <div class="copy"><input id="data-dir" readonly><button id="open-data">Open folder</button></div>
+      <p class="muted">A copy of your stats goes to <code>backups</code> once a day (last 14 kept) and before every update. Keep <code>auth.json</code> private: it is your Twitch login.</p>
+    </section>
+
+    <details class="card">
+      <summary><h2>Settings</h2></summary>
+      <label class="row"><input type="checkbox" id="set-autoCheck"> Check for updates automatically (at start and every 6 hours)</label>
+      <label class="row"><input type="checkbox" id="set-openPanel"> Open this panel when the app starts</label>
+      <label class="field">Twitch client ID <span class="muted">(only if you registered your own Twitch app; leave empty to use the built-in one)</span>
+        <input id="set-twitchClientId" placeholder="built-in" autocomplete="off" spellcheck="false"></label>
+      <label class="field">Update from repository <span class="muted">(owner/repo, for forks)</span>
+        <input id="set-updateRepo" spellcheck="false"></label>
+      <button id="save-settings">Save</button> <span id="settings-msg" class="muted"></span>
+    </details>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

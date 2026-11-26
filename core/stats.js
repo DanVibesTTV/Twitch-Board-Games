@@ -1,6 +1,6 @@
 // Viewer stats: wins per game, wins over all games, winning streaks.
-// Saved in the browser's localStorage, so they survive restarts of OBS and the overlay
-// (they belong to that one browser source and URL, see docs).
+// Saved through core/storage.js: the browser's localStorage, or a file on the PC when the
+// overlay runs from the companion app.
 //
 // What counts:
 //   - only human players (bots and chat-vote seats are never credited)
@@ -9,13 +9,15 @@
 //   - a win adds 1 to the streak; a loss resets it; a draw leaves it unchanged
 //   - games stopped with !bg stop are not recorded
 
+import { storage as defaultStorage } from './storage.js';
+
 const KEY = 'boardgames.stats.v1';
 
 const emptyData = () => ({ version: 1, players: {}, games: {} });
 
 export class StatsStore {
   // storage: anything with getItem/setItem (localStorage, or a fake in tests)
-  constructor(storage = safeLocalStorage()) {
+  constructor(storage = defaultStorage) {
     this.storage = storage;
     this.data = this.#load();
   }
@@ -116,8 +118,4 @@ export class StatsStore {
     else this.data = emptyData();
     this.#save();
   }
-}
-
-function safeLocalStorage() {
-  try { return globalThis.localStorage ?? null; } catch { return null; }
 }
