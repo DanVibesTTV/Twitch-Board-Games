@@ -413,3 +413,49 @@ test('game admin commands only run in the lobby and refresh the lobby info', asy
   assert.deepEqual(seen, ['6 sports']);
   assert.equal(refreshed, 1);
 });
+
+test('lobby reminders in chat before the countdown ends', async () => {
+  const bridge = new DevBridge();
+  const said = [];
+  bridge.sendChat = async (t) => said.push(t);
+  const registry = createRegistry([{ ...manifest, needs: [] }], async () => ludo);
+  const sched = fakeScheduler();
+  const s = new Session({ bridge, registry, scheduler: sched, config: { predictions: false, lobbySeconds: 45 } });
+  await s.openLobby('ludo');
+  bridge.inject('alice: !join');
+  bridge.inject('bob: !join');
+  await sched.runNext(); // 30 s left
+  await sched.runNext(); // 10 s left
+  const reminders = said.filter((t) => t.startsWith('⏳'));
+  assert.deepEqual(reminders, [
+    '⏳ 30s left to join Ludo! Type !join (2/4 seats taken)',
+    '⏳ 10s left to join Ludo! Type !join (2/4 seats taken)',
+  ]);
+  s.stop();
+});
+
+test('no reminders for short countdowns; draw modes count entries', async () => {
+  const man = JSON.parse(readFileSync(new URL('../games/four/manifest.json', import.meta.url)));
+  const four = await import('../games/four/logic.js');
+  const bridge = new DevBridge();
+  const said = [];
+  bridge.sendChat = async (t) => said.push(t);
+  const sched = fakeScheduler();
+  const s = new Session({ bridge, registry: createRegistry([{ ...man, needs: [] }], async () => four), scheduler: sched, config: { predictions: false, lobbySeconds: 15 } });
+  bridge.inject('!bg play four duel');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('a: !join'); bridge.inject('b: !join'); bridge.inject('c: !join');
+  await sched.runNext();
+  const r = said.filter((t) => t.startsWith('⏳'));
+  assert.deepEqual(r, []); // 15 s lobby: only "10 s left" would fit, but 15-10 < 8 → skipped
+  s.stop();
+  said.length = 0;
+  const s2 = new Session({ bridge: new DevBridge(), registry: createRegistry([{ ...man, needs: [] }], async () => four), scheduler: fakeScheduler(), config: { predictions: false } });
+  s2.bridge.sendChat = async (t) => said.push(t);
+  s2.bridge.inject('!bg play four duel');
+  await new Promise((r2) => setImmediate(r2));
+  s2.bridge.inject('a: !join'); s2.bridge.inject('b: !join'); s2.bridge.inject('c: !join');
+  await s2.sched.runNext();
+  assert.ok(said.some((t) => t === '⏳ 30s left to enter Four in a Row (Viewer Duel)! Type !join (3 entered)'), said.join('\n'));
+  s2.stop();
+});

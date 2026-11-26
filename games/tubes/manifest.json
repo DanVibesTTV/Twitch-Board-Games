@@ -4,23 +4,78 @@
   "tagline": "Race to 100 through a neon grid. Teleporters beam you up, tubes suck you down.",
   "version": "0.1.0",
   "coreVersion": "1.0.0",
-  "players": { "min": 2, "max": 8, "botFillTo": 4 },
-  "durationMinutes": [10, 20],
+  "players": {
+    "min": 2,
+    "max": 8,
+    "botFillTo": 4
+  },
+  "durationMinutes": [
+    10,
+    20
+  ],
   "needs": [],
   "thumbnail": "thumbnail.svg",
   "seats": [
-    { "id": "pink", "name": "Pink", "color": "#ff2bd6" },
-    { "id": "cyan", "name": "Cyan", "color": "#00e5ff" },
-    { "id": "lime", "name": "Lime", "color": "#a6ff00" },
-    { "id": "orange", "name": "Orange", "color": "#ff8a1a" },
-    { "id": "violet", "name": "Violet", "color": "#9b5cff" },
-    { "id": "gold", "name": "Gold", "color": "#ffe14a" },
-    { "id": "red", "name": "Red", "color": "#ff3b5c" },
-    { "id": "mint", "name": "Mint", "color": "#2bffb1" }
+    {
+      "id": "pink",
+      "name": "Pink",
+      "color": "#ff2bd6"
+    },
+    {
+      "id": "cyan",
+      "name": "Cyan",
+      "color": "#00e5ff"
+    },
+    {
+      "id": "lime",
+      "name": "Lime",
+      "color": "#a6ff00"
+    },
+    {
+      "id": "orange",
+      "name": "Orange",
+      "color": "#ff8a1a"
+    },
+    {
+      "id": "violet",
+      "name": "Violet",
+      "color": "#9b5cff"
+    },
+    {
+      "id": "gold",
+      "name": "Gold",
+      "color": "#ffe14a"
+    },
+    {
+      "id": "red",
+      "name": "Red",
+      "color": "#ff3b5c"
+    },
+    {
+      "id": "mint",
+      "name": "Mint",
+      "color": "#2bffb1"
+    }
   ],
   "commands": [
-    { "cmd": "!roll", "help": "roll the die on your turn" },
-    { "cmd": "!bg bots <n>", "help": "mods: how many seats bots fill up to (0 = none)" }
+    {
+      "cmd": "!roll",
+      "help": "roll the die on your turn"
+    },
+    {
+      "cmd": "!bg bots <n>",
+      "help": "mods: how many seats bots fill up to (0 = none)"
+    }
   ],
-  "defaultRules": { "exactFinish": true, "sixExtraTurn": false, "playToEnd": false }
+  "defaultRules": {
+    "exactFinish": true,
+    "sixExtraTurn": false,
+    "playToEnd": false
+  },
+  "howTo": [
+    "Type !roll on your turn and race from the launch bay to square 100.",
+    "Land on a teleporter to beam up, at a tube's mouth you get sucked down.",
+    "You need the exact roll for 100: extra steps bounce you back.",
+    "First to reach 100 wins."
+  ]
 }

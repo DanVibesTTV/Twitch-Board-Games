@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.6)
+# Twitch Board Games (v0.7)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -58,6 +58,8 @@ Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the brows
 | everyone | `!bgstats`, `!bgstats me`, `!bgstats <game>` | next leaderboard page on the game select screen; your own stats in chat; jump to a game's board |
 | everyone (draw modes) | `!join` | enter the draw; players are picked at random when the lobby closes |
 | mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]` / `!bg play trivia [standard\|quick\|classic]`, `!bg mode <mode>`, `!bg cat …` (trivia categories), `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
+
+While a lobby is open, the board area shows a **How to play** panel with the game's steps, the join call-to-action and a big countdown that turns red in the last 10 seconds. Chat gets reminders at **30 s and 10 s left**, with the seat or entry count. Short countdowns skip the reminders that wouldn't fit.
 
 When at least 2 humans play and the connection supports it (Lumia, Streamer.bot), a **Twitch prediction** with every seat as an outcome opens at game start. It resolves for the winner, or is refunded if the game is stopped or ends in a draw. A chat-vote seat counts as a player, so *Chat vs Streamer* gets a prediction too.
 

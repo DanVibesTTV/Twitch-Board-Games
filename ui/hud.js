@@ -29,7 +29,8 @@ export class Hud {
     this.toasts = el('div', 'hud-toasts');
     this.banner = el('div', 'hud-banner');
     this.questionBox = el('section', 'hud-question');
-    root.append(this.side, this.menu, this.questionBox, this.toasts, this.banner);
+    this.lobbyStage = el('section', 'hud-lobby');
+    root.append(this.side, this.menu, this.lobbyStage, this.questionBox, this.toasts, this.banner);
 
     this.seats = [];
     this.entrants = [];
@@ -46,6 +47,7 @@ export class Hud {
     session.on('seats', (seats) => { this.seats = seats; this.#renderSeats(); if (session.phase === 'lobby') this.#renderLobby(this.lobbyTimer); });
     session.on('lobbyTimer', (t) => { this.lobbyTimer = t; this.#renderLobby(t); });
     session.on('entrants', (list) => { this.entrants = list; if (session.phase === 'lobby') this.#renderLobby(this.lobbyTimer); });
+    session.on('phase', (p) => { if (p !== 'lobby') { clearTimeout(this.lobbyStageTimer); this.prevSeatIds = null; this.lobbyStageKey = null; } });
     session.on('decision', (d) => this.#renderDecision(d));
     session.on('votes', (tally) => this.#renderVotes(tally));
     session.on('log', ({ seat, text }) => this.#log(text, seat?.color));
@@ -158,6 +160,8 @@ export class Hud {
 
   #renderSeats() {
     const d = this.currentDecision;
+    const ids = new Set(this.seats.map((s) => s.occupant?.user?.id ?? s.occupant?.type).filter(Boolean));
+    const fresh = (s) => this.s.phase === 'lobby' && this.prevSeatIds && s.occupant?.user && !this.prevSeatIds.has(s.occupant.user.id);
     this.seatsBox.innerHTML = this.seats.map((s) => {
       const o = s.occupant;
       const draw = this.s.mode?.entry === 'draw' && this.s.phase === 'lobby';
@@ -166,9 +170,10 @@ export class Hud {
         : o.type === 'human' ? `${o.host ? '⭐ ' : ''}${esc(o.user.name)}`
         : o.type === 'crowd' ? '👥 Chat vote'
         : `🤖 Bot${o.replaced ? ` <span class="muted">(for ${esc(o.replaced)})</span>` : ''}`;
-      const active = d && d.seat?.id === s.id ? ' active' : '';
+      const active = (d && d.seat?.id === s.id ? ' active' : '') + (fresh(s) ? ' joined' : '');
       return `<div class="seat${active}" style="--c:${esc(s.color)}"><span class="chip"></span><span class="seat-name">${esc(s.name)}</span><span class="who">${who}</span></div>`;
     }).join('');
+    this.prevSeatIds = ids;
   }
 
   #renderLobby(t) {
@@ -179,17 +184,59 @@ export class Hud {
     const openSeat = this.seats.find((x) => !x.occupant) ?? m.seats[0];
     const recent = this.entrants.slice(-6).map((u) => esc(u.name)).join(', ');
     this.main.innerHTML = `
-      ${mode ? `<div class="mode-tag">${esc(mode.name)}</div>` : ''}
-      <div class="big">${draw ? 'Enter the draw!' : 'Join the game!'}</div>
-      ${mode?.description ? `<p>${esc(mode.description)}</p>` : ''}
       ${draw
         ? `<p>Type <b>${this.p}join</b> to enter. <span class="entrants"><b>${this.entrants.length}</b> entered${recent ? `: ${this.entrants.length > 6 ? '… ' : ''}${recent}` : ''}</span></p>`
         : `<p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(openSeat.id)}</b> to pick a color.</p>`}
       <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${this.s.botFillTo ? ` · empty seats become bots` : ''}${m.modes?.length > 1 ? ` · mods: ${this.p}bg mode ${m.modes.map((x) => x.id).join('|')}` : ''}</p>
       ${t ? `<div class="label">Starting in</div>${this.#timerBar(t.endsAt, t.total, true)}` : '<div class="muted">Countdown starts with the first player.</div>'}
-      <div class="lobby-info"></div>
-      <div class="help">${(m.commands ?? []).map((c) => `<div><b>${esc(c.cmd)}</b> ${esc(c.help)}</div>`).join('')}</div>`;
+      <div class="lobby-info"></div>`;
     this.#renderLobbyInfo();
+    this.#renderLobbyStage(t);
+  }
+
+  // Big "how to play" panel over the empty board area while the lobby is open.
+  #renderLobbyStage(t) {
+    const m = this.s.manifest;
+    const mode = this.s.mode;
+    const draw = mode?.entry === 'draw';
+    const steps = mode?.howTo ?? m.howTo ?? [];
+    const modCmds = (m.commands ?? []).filter((c) => c.cmd.startsWith(`${this.p}bg`) || c.cmd.startsWith('!bg'));
+    const playerCmds = (m.commands ?? []).filter((c) => !modCmds.includes(c));
+    const taken = this.seats.filter((s) => s.occupant && s.occupant.type !== 'reserved').length;
+    const count = draw ? `<b>${this.entrants.length}</b> entered` : `<b>${taken}</b>/${m.players.max} seats taken`;
+    const key = `${m.id}:${mode?.id ?? ''}`;
+    const enter = this.lobbyStageKey !== key; // animate only when the panel first appears
+    this.lobbyStageKey = key;
+    this.lobbyStage.innerHTML = `
+      <div class="ls-card${enter ? ' enter' : ''}">
+        <div class="ls-head">
+          ${m.thumbnailUrl ? `<img src="${esc(m.thumbnailUrl)}" alt="">` : ''}
+          <div>
+            <div class="ls-name">${esc(m.name)}</div>
+            ${mode ? `<span class="mode-tag">${esc(mode.name)}</span>` : ''}
+            ${mode?.description ? `<div class="ls-desc">${esc(mode.description)}</div>` : m.tagline ? `<div class="ls-desc">${esc(m.tagline)}</div>` : ''}
+          </div>
+        </div>
+        ${steps.length ? `<h3>How to play</h3><ol class="ls-steps">${steps.map((s) => `<li><span>${highlightCommands(esc(s))}</span></li>`).join('')}</ol>` : ''}
+        ${playerCmds.length && !steps.length ? `<div class="ls-cmds">${playerCmds.map((c) => `<span><b>${esc(c.cmd)}</b> ${esc(c.help)}</span>`).join('')}</div>` : ''}
+        <div class="ls-cta">
+          <div class="ls-join">Type <b>${this.p}join</b> ${draw ? 'to enter the draw' : 'to play'}<div class="ls-count-label">${count}</div></div>
+          <div class="ls-countdown">${t ? `<div class="ls-secs" data-ends="${t.endsAt}">${Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000))}</div><div class="ls-sub">seconds</div>` : '<div class="ls-wait">Waiting for the first player…</div>'}</div>
+        </div>
+        ${modCmds.length ? `<div class="ls-mods">Mods: ${modCmds.map((c) => `<b>${esc(c.cmd)}</b> ${esc(c.help.replace(/^mods:\s*/, ''))}`).join(' · ')}</div>` : ''}
+      </div>`;
+    this.#tickLobbyStage();
+  }
+
+  // Updates the big countdown; the last 10 seconds pulse red.
+  #tickLobbyStage() {
+    clearTimeout(this.lobbyStageTimer);
+    const node = this.lobbyStage.querySelector('.ls-secs');
+    if (!node || this.s.phase !== 'lobby') return;
+    const left = Math.max(0, Math.ceil((Number(node.dataset.ends) - Date.now()) / 1000));
+    node.textContent = String(left);
+    this.lobbyStage.querySelector('.ls-countdown').classList.toggle('urgent', left <= 10);
+    if (left > 0) this.lobbyStageTimer = setTimeout(() => this.#tickLobbyStage(), 250);
   }
 
   // Game-specific lobby details (e.g. trivia categories and whether their questions are loaded).
@@ -302,7 +349,9 @@ export class Hud {
     const tick = () => {
       const node = this.root.querySelector(`.secs[data-for="${id}"]`);
       if (!node) return;
-      node.textContent = `${Math.max(0, Math.ceil((endsAt - Date.now()) / 1000))}s`;
+      const left = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+      node.textContent = `${left}s`;
+      node.closest('.timer')?.classList.toggle('urgent', left <= 10);
       setTimeout(tick, 250);
     };
     setTimeout(tick, 0);
@@ -376,4 +425,9 @@ export function mountDevConsole(root, bridge) {
     if (q) bridge.inject(q);
   });
   root.append(form);
+}
+
+// "Type !roll …" → commands in a step get the accent color.
+function highlightCommands(text) {
+  return text.replace(/(![a-z0-9]+(?:[–-]![a-z0-9]+)?)/gi, '<b>$1</b>');
 }

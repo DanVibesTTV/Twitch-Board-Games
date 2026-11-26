@@ -22,7 +22,8 @@ games/
 | `players` | `{ "min": 2, "max": 8, "botFillTo": 4 }`. `botFillTo` (optional) = how many seats bots fill up to by default; mods change it with `!bg bots <n>` |
 | `seats` | `[{ "id": "red", "name": "Red", "color": "#e5484d" }, …]`. Viewers type `!join <id>` |
 | `needs` | `[]`, or any of `"hiddenInfo"`, `"sendChat"`, `"predictions"`. The game is greyed out if the bridge can't provide them |
-| `commands` | help lines shown in the lobby |
+| `commands` | short command reference; commands starting with `!bg` are listed as mod commands in the lobby |
+| `howTo` | 3–4 short steps shown in the big "How to play" panel while the lobby is open. Commands like `!roll` or `!1–!4` are highlighted automatically. A mode can override it with its own `howTo`. |
 | `modes` | optional ways to play, e.g. `[{ "id": "streamer", "name": "Duel the Streamer", "description": "…", "seats": { "red": "host" }, "entry": "draw" }]`. Seat roles: `host` (reserved for the broadcaster) and `crowd` (chat votes). `entry: "draw"` = viewers `!join` a pool and open seats are drawn at random when the lobby closes. The first mode is the default; mods pick one with `!bg play <game> <mode>` or `!bg mode <mode>`. |
 | `defaultRules` | passed to `createGame` as `rules` |
 

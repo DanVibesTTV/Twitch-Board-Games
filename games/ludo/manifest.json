@@ -4,19 +4,47 @@
   "tagline": "Roll a 6, race your pawns home, knock rivals back to start.",
   "version": "0.1.0",
   "coreVersion": "1.0.0",
-  "players": { "min": 2, "max": 4 },
-  "durationMinutes": [15, 30],
+  "players": {
+    "min": 2,
+    "max": 4
+  },
+  "durationMinutes": [
+    15,
+    30
+  ],
   "needs": [],
   "thumbnail": "thumbnail.svg",
   "seats": [
-    { "id": "red", "name": "Red", "color": "#e5484d" },
-    { "id": "green", "name": "Green", "color": "#2f9e64" },
-    { "id": "yellow", "name": "Yellow", "color": "#f0b400" },
-    { "id": "blue", "name": "Blue", "color": "#3b74e8" }
+    {
+      "id": "red",
+      "name": "Red",
+      "color": "#e5484d"
+    },
+    {
+      "id": "green",
+      "name": "Green",
+      "color": "#2f9e64"
+    },
+    {
+      "id": "yellow",
+      "name": "Yellow",
+      "color": "#f0b400"
+    },
+    {
+      "id": "blue",
+      "name": "Blue",
+      "color": "#3b74e8"
+    }
   ],
   "commands": [
-    { "cmd": "!roll", "help": "roll the die on your turn" },
-    { "cmd": "!1 … !4", "help": "move the pawn with that number" }
+    {
+      "cmd": "!roll",
+      "help": "roll the die on your turn"
+    },
+    {
+      "cmd": "!1 … !4",
+      "help": "move the pawn with that number"
+    }
   ],
   "defaultRules": {
     "sixExtraTurn": true,
@@ -24,5 +52,11 @@
     "threeTriesWhenStuck": true,
     "safeSquares": true,
     "captureBonus": false
-  }
+  },
+  "howTo": [
+    "Type !roll on your turn. You need a 6 to bring a pawn out of your yard.",
+    "Pick which pawn moves with !1–!4. The numbers float above your pawns.",
+    "Land on a rival pawn to send it back home. Stars and start squares are safe.",
+    "Bring all 4 pawns into the center first to win. A 6 gives you another roll."
+  ]
 }
