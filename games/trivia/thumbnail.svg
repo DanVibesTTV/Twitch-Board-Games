@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 150">
+<defs><radialGradient id="bg" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#14204a"/><stop offset="1" stop-color="#04060f"/></radialGradient><filter id="gl" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<rect width="150" height="150" rx="12" fill="url(#bg)"/>
+<circle cx="75" cy="75" r="52" fill="none" stroke="#0a1230" stroke-width="10"/>
+<circle cx="75" cy="75" r="61" fill="none" stroke="#a66bff" stroke-opacity=".5" stroke-dasharray="3 2"/>
+<circle cx="82.8" cy="23.6" r="3.4" fill="#ff4fb4"/>
+<circle cx="90.3" cy="25.3" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="97.6" cy="28.1" r="3.4" fill="#ff8a3d"/>
+<circle cx="104.3" cy="32.0" r="3.4" fill="#ffd23f"/>
+<circle cx="110.4" cy="36.9" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="115.7" cy="42.6" r="3.4" fill="#a66bff"/>
+<circle cx="123.4" cy="56.0" r="3.4" fill="#3ddc84"/>
+<circle cx="125.7" cy="63.4" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="126.9" cy="71.1" r="3.4" fill="#a66bff"/>
+<circle cx="126.9" cy="78.9" r="3.4" fill="#ff4fb4"/>
+<circle cx="125.7" cy="86.6" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="123.4" cy="94.0" r="3.4" fill="#3d8bff"/>
+<circle cx="115.7" cy="107.4" r="3.4" fill="#ff8a3d"/>
+<circle cx="110.4" cy="113.1" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="104.3" cy="118.0" r="3.4" fill="#3d8bff"/>
+<circle cx="97.6" cy="121.9" r="3.4" fill="#3ddc84"/>
+<circle cx="90.3" cy="124.7" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="82.8" cy="126.4" r="3.4" fill="#ffd23f"/>
+<circle cx="67.2" cy="126.4" r="3.4" fill="#a66bff"/>
+<circle cx="59.7" cy="124.7" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="52.4" cy="121.9" r="3.4" fill="#ffd23f"/>
+<circle cx="45.7" cy="118.0" r="3.4" fill="#ff8a3d"/>
+<circle cx="39.6" cy="113.1" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="34.3" cy="107.4" r="3.4" fill="#ff4fb4"/>
+<circle cx="26.6" cy="94.0" r="3.4" fill="#3d8bff"/>
+<circle cx="24.3" cy="86.6" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="23.1" cy="78.9" r="3.4" fill="#ff4fb4"/>
+<circle cx="23.1" cy="71.1" r="3.4" fill="#a66bff"/>
+<circle cx="24.3" cy="63.4" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="26.6" cy="56.0" r="3.4" fill="#3ddc84"/>
+<circle cx="34.3" cy="42.6" r="3.4" fill="#ffd23f"/>
+<circle cx="39.6" cy="36.9" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="45.7" cy="32.0" r="3.4" fill="#3ddc84"/>
+<circle cx="52.4" cy="28.1" r="3.4" fill="#3d8bff"/>
+<circle cx="59.7" cy="25.3" r="3" fill="#0b1230" stroke="#fff" stroke-width=".8"/>
+<circle cx="67.2" cy="23.6" r="3.4" fill="#ff8a3d"/>
+<rect x="72.2" y="26.5" width="5.6" height="5.6" rx="1.5" fill="#ffd23f"/>
+<rect x="72.2" y="32.9" width="5.6" height="5.6" rx="1.5" fill="#ff4fb4"/>
+<rect x="72.2" y="39.2" width="5.6" height="5.6" rx="1.5" fill="#3ddc84"/>
+<rect x="72.2" y="45.5" width="5.6" height="5.6" rx="1.5" fill="#ff8a3d"/>
+<rect x="72.2" y="51.9" width="5.6" height="5.6" rx="1.5" fill="#a66bff"/>
+<rect x="111.7" y="49.4" width="5.6" height="5.6" rx="1.5" fill="#ff4fb4"/>
+<rect x="106.3" y="52.5" width="5.6" height="5.6" rx="1.5" fill="#3ddc84"/>
+<rect x="100.8" y="55.7" width="5.6" height="5.6" rx="1.5" fill="#ff8a3d"/>
+<rect x="95.3" y="58.9" width="5.6" height="5.6" rx="1.5" fill="#a66bff"/>
+<rect x="89.8" y="62.0" width="5.6" height="5.6" rx="1.5" fill="#3d8bff"/>
+<rect x="111.7" y="95.0" width="5.6" height="5.6" rx="1.5" fill="#3ddc84"/>
+<rect x="106.3" y="91.9" width="5.6" height="5.6" rx="1.5" fill="#ff8a3d"/>
+<rect x="100.8" y="88.7" width="5.6" height="5.6" rx="1.5" fill="#a66bff"/>
+<rect x="95.3" y="85.5" width="5.6" height="5.6" rx="1.5" fill="#3d8bff"/>
+<rect x="89.8" y="82.4" width="5.6" height="5.6" rx="1.5" fill="#ffd23f"/>
+<rect x="72.2" y="117.9" width="5.6" height="5.6" rx="1.5" fill="#ff8a3d"/>
+<rect x="72.2" y="111.5" width="5.6" height="5.6" rx="1.5" fill="#a66bff"/>
+<rect x="72.2" y="105.2" width="5.6" height="5.6" rx="1.5" fill="#3d8bff"/>
+<rect x="72.2" y="98.9" width="5.6" height="5.6" rx="1.5" fill="#ffd23f"/>
+<rect x="72.2" y="92.5" width="5.6" height="5.6" rx="1.5" fill="#ff4fb4"/>
+<rect x="32.7" y="95.0" width="5.6" height="5.6" rx="1.5" fill="#a66bff"/>
+<rect x="38.1" y="91.9" width="5.6" height="5.6" rx="1.5" fill="#3d8bff"/>
+<rect x="43.6" y="88.7" width="5.6" height="5.6" rx="1.5" fill="#ffd23f"/>
+<rect x="49.1" y="85.5" width="5.6" height="5.6" rx="1.5" fill="#ff4fb4"/>
+<rect x="54.6" y="82.4" width="5.6" height="5.6" rx="1.5" fill="#3ddc84"/>
+<rect x="32.7" y="49.4" width="5.6" height="5.6" rx="1.5" fill="#3d8bff"/>
+<rect x="38.1" y="52.5" width="5.6" height="5.6" rx="1.5" fill="#ffd23f"/>
+<rect x="43.6" y="55.7" width="5.6" height="5.6" rx="1.5" fill="#ff4fb4"/>
+<rect x="49.1" y="58.9" width="5.6" height="5.6" rx="1.5" fill="#3ddc84"/>
+<rect x="54.6" y="62.0" width="5.6" height="5.6" rx="1.5" fill="#ff8a3d"/>
+<polygon points="75,75 68.0,62.9 82.0,62.9" fill="#3d8bff"/>
+<polygon points="75,75 82.0,62.9 89.0,75.0" fill="#ffd23f"/>
+<polygon points="75,75 89.0,75.0 82.0,87.1" fill="#ff4fb4"/>
+<polygon points="75,75 82.0,87.1 68.0,87.1" fill="#3ddc84"/>
+<polygon points="75,75 68.0,87.1 61.0,75.0" fill="#ff8a3d"/>
+<polygon points="75,75 61.0,75.0 68.0,62.9" fill="#a66bff"/>
+<circle cx="75" cy="75" r="6" fill="#060a1c" stroke="#bff4ff" stroke-width="1"/>
+<polygon points="75.0,15.0 81.9,19.0 81.9,27.0 75.0,31.0 68.1,27.0 68.1,19.0" fill="#3d8bff" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<polygon points="120.0,41.0 127.0,45.0 127.0,53.0 120.0,57.0 113.1,53.0 113.1,45.0" fill="#ffd23f" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<polygon points="120.0,93.0 127.0,97.0 127.0,105.0 120.0,109.0 113.1,105.0 113.1,97.0" fill="#ff4fb4" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<polygon points="75.0,119.0 81.9,123.0 81.9,131.0 75.0,135.0 68.1,131.0 68.1,123.0" fill="#3ddc84" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<polygon points="30.0,93.0 36.9,97.0 36.9,105.0 30.0,109.0 23.0,105.0 23.0,97.0" fill="#ff8a3d" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<polygon points="30.0,41.0 36.9,45.0 36.9,53.0 30.0,57.0 23.0,53.0 23.0,45.0" fill="#a66bff" stroke="#fff" stroke-width="1.2" filter="url(#gl)"/>
+<circle cx="122" cy="124" r="14" fill="#1b2440" stroke="#20e3ff" stroke-width="2" filter="url(#gl)"/>
+<path d="M122,124 L122.4,113.0 A11,11 0 0,1 131.1,117.8 Z" fill="#3d8bff"/>
+<path d="M122,124 L131.3,129.9 A11,11 0 0,1 122.9,135.0 Z" fill="#ff4fb4"/>
+<path d="M122,124 L121.6,135.0 A11,11 0 0,1 112.9,130.2 Z" fill="#3ddc84"/>
+<path d="M122,124 L112.7,118.1 A11,11 0 0,1 121.1,113.0 Z" fill="#a66bff"/>
+</svg>

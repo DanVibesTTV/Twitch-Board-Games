@@ -51,6 +51,21 @@ Options can be `disabled: true` (for example a full column). They stay in the li
 
 `events` are for the renderer only (for example `{type:'move', …}`). The core passes them through untouched.
 
+### Optional extras
+
+| Export / field | What it does |
+|---|---|
+| `preload({ manifest, mode })` | called when the lobby opens; start loading data here (Trivia Champ fetches questions) |
+| `async prepare({ manifest, mode, rules })` | awaited before `createGame` (max 15 s); whatever it returns arrives as `createGame({ ctx })` |
+| `adminCommand(sub, arg, { say, prefix, refresh })` | handle your own `!bg <sub>` commands in the lobby; return `true` if handled, call `refresh()` to redraw the lobby |
+| `lobbyInfo()` | `{ chips: [{ color, label, ready }], note }` shown in the lobby panel |
+| `game.timeoutChoice()` | what a timeout means for the current decision (e.g. `'timeout'` = wrong answer); return `undefined` to let the bot move |
+| `decision.seconds` | time limit for this decision instead of the default turn time |
+| `decision.question` | `{ text, category, color, difficulty, final, hq, source }`: the HUD shows a big question card; an `{ type: 'answer', correctIndex, chosen, correct, timeout }` event reveals the result |
+| `mode.rules` (manifest) | rules merged over `defaultRules` for that mode |
+
+The HUD also receives each move's events (`session.on('gameEvents')`), so games can drive HUD effects like the answer reveal.
+
 ## Renderer: `createRenderer(stage, { seats })`
 
 `stage` is the shared `Stage` (`stage.scene`, `stage.animate(ms, t => …)`, `stage.wait(ms)`, `stage.frame(size, opts)`, `stage.invalidate()`). Return:

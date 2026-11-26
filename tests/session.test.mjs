@@ -18,6 +18,16 @@ function fakeScheduler() {
   return {
     setTimeout: (fn, ms) => { timers.set(++id, { fn, at: now + ms }); return id; },
     clearTimeout: (i) => timers.delete(i),
+    // run only the earliest timer (after letting async work settle)
+    async runNext() {
+      await new Promise((r) => setImmediate(r));
+      if (!timers.size) return false;
+      const [i, t] = [...timers.entries()].sort((a, b) => a[1].at - b[1].at)[0];
+      timers.delete(i); now = t.at; t.fn();
+      await new Promise((r) => setImmediate(r));
+      return true;
+    },
+    async runOne() { return this.runNext(); },
     async runAll(limit = 100000) {
       for (let n = 0; n < limit; n++) {
         await new Promise((r) => setImmediate(r)); // let async work settle
@@ -340,4 +350,66 @@ test('stopped games are not recorded', async () => {
   await new Promise((r) => setImmediate(r));
   bridge.inject('!bg stop');
   assert.deepEqual(stats.data.players, {});
+});
+
+// ── hooks used by Trivia Champ ──
+test('prepare() context, mode rules and timeout-as-wrong reach the game', async () => {
+  const man = JSON.parse(readFileSync(new URL('../games/trivia/manifest.json', import.meta.url)));
+  const logic = await import('../games/trivia/logic.js');
+  let preloaded = 0;
+  let prepared = null;
+  const module = {
+    ...logic,
+    preload: () => { preloaded++; },
+    prepare: async (opts) => { prepared = opts; return { marker: 'ctx' }; },
+    createGame: (opts) => { module.lastOpts = opts; return logic.createGame(opts); },
+  };
+  const bridge = new DevBridge();
+  const registry = createRegistry([{ ...man, needs: [] }], async () => module);
+  const sched = fakeScheduler();
+  const s = new Session({ bridge, registry, scheduler: sched, config: { predictions: false, afkLimit: 99 } });
+  const events = [];
+  s.on('gameEvents', (e) => events.push(...e));
+  bridge.inject('!bg play trivia quick');
+  await new Promise((r) => setImmediate(r));
+  assert.equal(preloaded, 1, 'preload when the lobby opens');
+  bridge.inject('alice: !join');
+  bridge.inject('!bg start');
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  assert.equal(s.phase, 'playing');
+  assert.equal(prepared.rules.wedgesToWin, 3, 'mode rules passed to prepare');
+  assert.equal(module.lastOpts.ctx.marker, 'ctx', 'prepare result passed to createGame');
+  assert.equal(module.lastOpts.rules.finalQuestion, false);
+  // drive alice to a question, then let her time out
+  for (let i = 0; i < 200 && !(s.decision?.kind === 'question' && s.decision.seat === 0); i++) {
+    if (s.decision?.seat === 0) bridge.inject(s.decision.kind === 'roll' ? 'alice: !roll' : 'alice: !1');
+    await sched.runOne?.();
+    await new Promise((r) => setImmediate(r));
+  }
+  assert.equal(s.decision?.kind, 'question', 'reached a question for alice');
+  {
+    const before = events.length;
+    await sched.runNext();
+    const answer = events.slice(before).find((e) => e.type === 'answer');
+    assert.ok(answer?.timeout, 'a timed-out question counts as a wrong answer, not a bot answer');
+  }
+  s.stop();
+});
+
+test('game admin commands only run in the lobby and refresh the lobby info', async () => {
+  const man = JSON.parse(readFileSync(new URL('../games/four/manifest.json', import.meta.url)));
+  const four = await import('../games/four/logic.js');
+  const seen = [];
+  const module = { ...four, adminCommand: (sub, arg, api) => { if (sub !== 'cat') return false; seen.push(arg); api.refresh(); return true; } };
+  const bridge = new DevBridge();
+  const s = new Session({ bridge, registry: createRegistry([{ ...man, needs: [] }], async () => module), scheduler: fakeScheduler(), config: { predictions: false } });
+  let refreshed = 0;
+  s.on('lobbyInfo', () => refreshed++);
+  bridge.inject('!bg cat 6 sports'); // menu: ignored
+  bridge.inject('!bg play four duel');
+  await new Promise((r) => setImmediate(r));
+  bridge.inject('!bg cat 6 sports');
+  bridge.inject('viewer: !bg cat 1 music'); // not a mod
+  assert.deepEqual(seen, ['6 sports']);
+  assert.equal(refreshed, 1);
 });
