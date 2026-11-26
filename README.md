@@ -78,7 +78,7 @@ streamerbot/ BoardGames.sb (Streamer.bot import file) + the C# source of its bri
 tests/       npm test  (logic + session, runs in Node)
 ```
 
-## Status / to-do
-- The 3D rendering (unfold, pawns, dice) is written but has **not been checked in a real browser yet**. Expect some tuning of the camera, sizes and timings on the first run.
-- The Lumia chat format and prediction commands follow Lumia's developer docs and need a live test. Lumia offers no whisper command.
-- Planned: a local Node companion app (Twitch OAuth), and a Twitch Extension with a hosted backend for hidden-information games.
+## Status
+- **Tested live:** Ludo and Tubes & Teleporters in OBS. Twitch predictions work through both Lumia Stream and Streamer.bot.
+- Lumia has no whisper command, so future hidden-information games will need Streamer.bot (or the planned Node app) for private hands.
+- **Planned:** a local Node companion app (Twitch OAuth), and a Twitch Extension with a hosted backend for hidden-information games.
