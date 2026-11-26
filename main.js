@@ -5,7 +5,7 @@
 //   index.html?bridge=streamerbot&port=8080            → Streamer.bot
 //   http://127.0.0.1:8765/?bridge=node                 → companion app (node app/companion.mjs)
 // Optional: game=ludo (skip the browser), mode=duel (with game=), turn=30, lobby=45, vote=15, bots=0,
-//           predictions=0, prefix=!, after=lobby (rematch instead of game select), preview=1 (dark background), fps=60,
+//           predictions=0, prefix=!, after=lobby (rematch instead of game select), bg=dark | bg=transparent | bg=<hex color, e.g. 102030> (background; preview=1 = dark), fps=60,
 //           volume=0.8 (0–1), mute=1, stats=0 (no viewer stats)
 
 import { createBridge } from './bridges/index.js';
@@ -24,7 +24,7 @@ const bool = (k, d) => (q.has(k) ? !['0', 'false', 'no'].includes(q.get(k)) : d)
 
 async function main() {
   const bridgeKind = q.get('bridge') ?? 'dev';
-  if (bridgeKind === 'dev' || bool('preview', false)) document.body.classList.add('preview');
+  applyBackground(q.get('bg') ?? (bridgeKind === 'dev' || bool('preview', false) ? 'dark' : 'transparent'));
 
   const bridge = createBridge(bridgeKind, {
     channel: q.get('channel'),
@@ -70,6 +70,13 @@ async function main() {
 
   // handy for debugging from the browser console
   Object.assign(window, { session, bridge, stage });
+}
+
+// Transparent for OBS by default; "dark" is the soft dark gradient, a hex colour gives a solid background.
+function applyBackground(bg) {
+  const value = String(bg).trim().replace(/^#/, '');
+  if (value === 'dark' || value === '1') document.body.classList.add('preview');
+  else if (/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value)) document.body.style.background = `#${value}`;
 }
 
 main().catch((err) => {

@@ -10,7 +10,7 @@ let botLogin = null;
 let version = null;
 
 // ---- OBS URL options (defaults match main.js; only changed values go into the URL) ----
-const DEFAULTS = { game: '', mode: '', after: 'menu', turn: 30, lobby: 45, vote: 15, bots: true, predictions: true, stats: true, prefix: '!', volume: 0.8, mute: false, fps: '60' };
+const DEFAULTS = { game: '', mode: '', after: 'menu', turn: 30, lobby: 45, vote: 15, bots: true, predictions: true, stats: true, prefix: '!', volume: 0.8, mute: false, fps: '60', bg: 'transparent', bgcolor: '#1d1a2e' };
 let options = { ...DEFAULTS };
 let games = [];   // manifests, for the game and mode lists
 
@@ -51,6 +51,8 @@ function obsQuery(o) {
   for (const [k, def] of Object.entries(DEFAULTS)) {
     let v = o[k];
     if (k === 'mode' && !o.game) continue;
+    if (k === 'bgcolor') continue;
+    if (k === 'bg' && v === 'color') v = String(o.bgcolor ?? DEFAULTS.bgcolor).replace('#', '');
     if (v === def || v === undefined || (typeof def === 'number' && Number(v) === def)) continue;
     if (typeof def === 'boolean') v = v ? '1' : '0';
     if (v === '') continue;
@@ -60,6 +62,7 @@ function obsQuery(o) {
 }
 
 function renderUrl() {
+  $('bgcolor-field').hidden = options.bg !== 'color';
   $('obs-url').value = `${location.origin}/?${obsQuery(options)}`;
   $('preview').href = `${location.origin}/?${obsQuery(options)}&preview=1`;
   $('volume-label').textContent = `${Math.round(options.volume * 100)}%${options.mute ? ' (muted)' : ''}`;

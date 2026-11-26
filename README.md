@@ -99,7 +99,7 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
-Options: `game=ludo`, `game=tubes`, `game=four`, `game=trivia`, `game=jazzy` or `game=pokerdice` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
+Options: `game=ludo`, `game=tubes`, `game=four`, `game=trivia`, `game=jazzy` or `game=pokerdice` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`, `bg=dark` (dark background instead of transparent; or a solid colour like `bg=102030`).
 
 **Sound:** tick **"Control audio via OBS"** on the browser source so the game shows up in the audio mixer. All sounds are synthesized in code: a classic set (dice rattle, wooden steps, punch, whoosh) and a futuristic set (zaps, teleport, tube slide, win jingle). To use your own recordings, see `sounds/README.md`. In a normal browser, click the page once to enable audio.
 
