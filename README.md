@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.7)
+# Twitch Board Games (v0.8)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -17,18 +17,29 @@ The overlay is published with GitHub Pages:
 
 Paste that URL plus the settings below into an OBS Browser Source. Every push to `main` runs the tests and redeploys.
 
-### Option B: host your own copy
+### Option B: companion app (runs on your PC)
+A small program that serves the overlay, logs in to Twitch itself and keeps everything on your PC. You need it if you use neither Lumia Stream nor Streamer.bot but still want chat messages and predictions. It's also handy alongside them:
+
+- **Twitch login built in:** read and write chat, plus Twitch predictions (Affiliate/Partner), with no extra app.
+- **Stats in a file** on your PC instead of the browser source's cache, with daily backups.
+- **Updates from this repo:** the app checks GitHub for new versions and installs them with one click. Your stats and login are kept.
+
+1. Install **Node.js 22 or newer** ([how](#installing-nodejs)).
+2. Download this repo (green **Code** button → **Download ZIP**) and extract it somewhere permanent, e.g. `Documents\Twitch Board Games`.
+3. **Windows:** double-click **`Start Board Games.bat`**. **macOS/Linux:** open a terminal in the folder and run `npm start` (same as `node app/companion.mjs`).
+4. The control panel opens in your browser (`http://127.0.0.1:8765/panel/`). Click **Log in with Twitch**, confirm the code on twitch.tv, done.
+5. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`**. The panel's OBS section has checkboxes and fields for the game options and builds the URL for you (copy button included).
+
+Keep the app's window open while you stream. Details, troubleshooting and how updates work: [`docs/COMPANION.md`](docs/COMPANION.md).
+
+### Option C: host your own copy
 - **Fork** this repo, then in your fork go to **Settings → Pages → Source: "GitHub Actions"** and push any commit (or run the workflow from the Actions tab). Your copy goes live at `https://<you>.github.io/Twitch-Board-Games/`.
-- **Or run it locally** (no npm install needed):
-  ```bash
-  node tools/serve.mjs
-  ```
-  Then use `http://127.0.0.1:8765/` instead of the GitHub URL. ES modules don't load from `file://`, so the folder has to be served over http. This needs **Node.js** installed (see below).
+- **Or just serve the folder** without the companion's extras: `node tools/serve.mjs` (or `npm run serve`), then use `http://127.0.0.1:8765/` instead of the GitHub URL. ES modules don't load from `file://`, so the folder has to be served over http.
 
-### Installing Node.js (only needed to run it locally)
-You only need Node.js for the `node` command above (and for `npm test` if you work on the code). The hosted URL and GitHub Pages forks need nothing installed.
+### Installing Node.js
+Only needed for the companion app or `tools/serve.mjs` (and `npm test` if you work on the code). The hosted URL and GitHub Pages forks need nothing installed.
 
-Any version from **18** up works; just pick the current **LTS** ("Long Term Support") release.
+You need version **22 or newer**; just pick the current **LTS** ("Long Term Support") release.
 
 **Windows**
 1. Go to **https://nodejs.org**, download the **LTS** Windows Installer (`.msi`) and run it. Clicking *Next* through the default options is fine.
@@ -46,20 +57,17 @@ Use your distro's package manager or the instructions on https://nodejs.org/en/d
 ```bash
 node -v
 ```
-It should print a version like `v22.x.x` or higher.
+It should print `v22.x.x` or higher.
 
-**Start the overlay:**
-1. Download this repo (green **Code** button → **Download ZIP**, then extract it) or clone it.
-2. Open a terminal **in that folder**:
-   - Windows: open the folder in Explorer, click the address bar, type `cmd` and press Enter (or right-click an empty spot → *Open in Terminal*).
-   - macOS: right-click the folder in Finder → *New Terminal at Folder*.
-3. Run `node tools/serve.mjs` (or `npm start`). It prints `Board games overlay: http://127.0.0.1:8765/?bridge=dev`; open that in a browser to test, and use `http://127.0.0.1:8765/` in OBS.
-4. **Leave that window open** while you stream; closing it stops the overlay. Press `Ctrl+C` to stop it.
+**Opening a terminal in the folder** (for `npm start` or `node tools/serve.mjs`):
+- Windows: open the folder in Explorer, click the address bar, type `cmd` and press Enter (or right-click an empty spot → *Open in Terminal*).
+- macOS: right-click the folder in Finder → *New Terminal at Folder*.
 
 **Troubleshooting**
 - *"'node' is not recognized"* / *"command not found: node"*: the terminal was opened before Node.js was installed. Close it and open a new one (restart the PC if it still fails).
-- *"Cannot find module …tools/serve.mjs"*: the terminal isn't in the repo folder. Check that the folder you opened contains `index.html` and a `tools` folder.
-- *"EADDRINUSE"*: the server is already running in another window (or another app uses port 8765). Close the other window, or pick another port: `node tools/serve.mjs 8766` (then use that port in the URL).
+- *"needs Node.js 22 or newer"*: install the current LTS from nodejs.org over your old version.
+- *"Cannot find module …"*: the terminal isn't in the repo folder. Check that the folder you opened contains `index.html` and the `app` and `tools` folders.
+- *"Port 8765 is already in use"*: the app is already running in another window (or another program uses the port). Close the other window, or pick another port: `node app/companion.mjs 8766` (then use that port in the URLs).
 
 ### Try it without Twitch
 Open the overlay URL with `?bridge=dev` in a normal browser. Use the box at the bottom to chat as anyone:
@@ -77,10 +85,11 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 | No extra app (chat read-only) | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=irc&channel=YOURNAME` |
 | Lumia Stream | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=lumia&token=YOUR_LUMIA_API_TOKEN` |
 | Streamer.bot | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=streamerbot` (import `streamerbot/BoardGames.sb` once, see `docs/STREAMERBOT.md`) |
+| Companion app | `http://127.0.0.1:8765/?bridge=node` (only while the app runs, see [Option B](#option-b-companion-app-runs-on-your-pc)) |
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
-Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the browser), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
+Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the browser; add `mode=duel` etc. for a game's mode), `turn=30`, `lobby=45`, `vote=15`, `bots=0`, `predictions=0`, `after=lobby` (rematch instead of returning to game select), `prefix=!`, `fps=60`, `volume=0.8`, `mute=1`, `stats=0`.
 
 **Sound:** tick **"Control audio via OBS"** on the browser source so the game shows up in the audio mixer. All sounds are synthesized in code: a classic set (dice rattle, wooden steps, punch, whoosh) and a futuristic set (zaps, teleport, tube slide, win jingle). To use your own recordings, see `sounds/README.md`. In a normal browser, click the page once to enable audio.
 
@@ -97,7 +106,7 @@ Options: `game=ludo`, `game=tubes`, `game=four` or `game=trivia` (skip the brows
 
 While a lobby is open, the board area shows a **How to play** panel with the game's steps, the join call-to-action and a big countdown that turns red in the last 10 seconds. Chat gets reminders at **30 s and 10 s left**, with the seat or entry count. Short countdowns skip the reminders that wouldn't fit.
 
-When at least 2 humans play and the connection supports it (Lumia, Streamer.bot), a **Twitch prediction** with every seat as an outcome opens at game start. It resolves for the winner, or is refunded if the game is stopped or ends in a draw. A chat-vote seat counts as a player, so *Chat vs Streamer* gets a prediction too.
+When at least 2 humans play and the connection supports it (Lumia, Streamer.bot, companion app), a **Twitch prediction** with every seat as an outcome opens at game start. It resolves for the winner, or is refunded if the game is stopped or ends in a draw. A chat-vote seat counts as a player, so *Chat vs Streamer* gets a prediction too.
 
 ## Trivia Champ
 - **Turn:** `!roll`, then pick a destination (`!1`…). You move exactly the number rolled, you can't step back, and you can turn at an HQ or the hub. You then answer a question in that space's category (`!1`–`!4`, 30 s). A right answer lets you roll again, and on a category HQ it also earns that wedge. A wrong answer or a timeout passes the turn. Roll-again spaces skip the question, and on the hub you pick the category.
@@ -112,7 +121,9 @@ The game select screen shows a leaderboard. `!bgstats` turns the page: **most wi
 - Only human players count; bots and chat-vote seats are never credited.
 - Everyone seated at the start has played, even if they leave or go AFK. Leaving can't protect a streak, and a bot playing for you can't win for you.
 - A win adds to your streak, a loss resets it, and a draw leaves it unchanged. Games stopped with `!bg stop` aren't recorded.
-- Stats are saved in the browser source's own storage (localStorage). They survive OBS restarts, but they belong to that one URL in that one browser: the hosted page and `127.0.0.1` keep separate stats, and clearing the browser source's cache can delete them. Turn stats off with `&stats=0`; mods reset them with `!bg stats reset confirm` (or `!bg stats reset four confirm` for one game).
+- Stats are saved in the browser source's own storage (localStorage). They survive OBS restarts, but they belong to that one URL in that one browser: the hosted page and `127.0.0.1` keep separate stats, and clearing the browser source's cache can delete them.
+- With the **companion app** (`?bridge=node`) stats go to a file on your PC instead, with daily backups. The first time the overlay connects to the app, stats that browser source already saved for `127.0.0.1:8765` are copied into the file (stats from the hosted GitHub URL live under a different address and stay there).
+- Turn stats off with `&stats=0`; mods reset them with `!bg stats reset confirm` (or `!bg stats reset four confirm` for one game).
 
 ## What each connection can do
 
@@ -121,6 +132,7 @@ The game select screen shows a leaderboard. `!bgstats` turns the page: **most wi
 | `irc` (anonymous) | ✓ | – | – | – |
 | `lumia` | ✓ | ✓ | – | ✓ |
 | `streamerbot` | ✓ | ✓ | ✓ | ✓ |
+| `node` (companion app) | ✓ | ✓ | – | ✓ |
 | `dev` | typed | logged | logged | logged |
 
 ## Layout
@@ -137,5 +149,6 @@ tests/       npm test  (logic + session, runs in Node)
 
 ## Status
 - **Tested live:** Ludo and Tubes & Teleporters in OBS. Twitch predictions work through both Lumia Stream and Streamer.bot.
-- Lumia has no whisper command, so future hidden-information games will need Streamer.bot (or the planned Node app) for private hands.
-- **Planned:** a local Node companion app (Twitch OAuth), and a Twitch Extension with a hosted backend for hidden-information games.
+- Lumia has no whisper command, so future hidden-information games will need Streamer.bot for private hands.
+- **New in 0.8:** the companion app (Twitch login, stats file, one-click updates). Needs a live test with a real Twitch login.
+- **Planned:** packaging the companion as a desktop program (`.exe`), and a Twitch Extension with a hosted backend for hidden-information games.

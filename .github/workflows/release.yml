@@ -1,0 +1,38 @@
+# Publishes a GitHub Release whenever package.json's "version" changes on main.
+# The companion app checks the latest release to offer updates, so bump the version
+# in a PR when it should reach streamers (docs-only changes can skip the bump).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - name: Create the release if this version is new
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="v$(node -p "require('./package.json').version")"
+          if git rev-parse "$VERSION" >/dev/null 2>&1; then
+            echo "$VERSION already released"
+            exit 0
+          fi
+          gh release create "$VERSION" --target "$GITHUB_SHA" --title "Twitch Board Games $VERSION" --generate-notes
