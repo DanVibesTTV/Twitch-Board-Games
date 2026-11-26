@@ -5,11 +5,12 @@
 //   index.html?bridge=streamerbot&port=8080            → Streamer.bot
 // Optional: game=ludo (skip the browser), turn=30, lobby=45, vote=15, bots=0,
 //           predictions=0, prefix=!, after=lobby (rematch instead of game select), preview=1 (dark background), fps=60,
-//           volume=0.8 (0–1), mute=1
+//           volume=0.8 (0–1), mute=1, stats=0 (no viewer stats)
 
 import { createBridge } from './bridges/index.js';
 import { loadRegistry } from './core/registry.js';
 import { Session } from './core/session.js';
+import { StatsStore } from './core/stats.js';
 import { Stage } from './renderer/stage.js';
 import { Sfx } from './renderer/audio.js';
 import { createView } from './renderer/view.js';
@@ -44,7 +45,8 @@ async function main() {
     predictions: bool('predictions', true),
     afterGame: q.get('after') ?? 'menu',
   };
-  const session = new Session({ bridge, registry, view: createView(stage), config });
+  const stats = bool('stats', true) ? new StatsStore() : null;
+  const session = new Session({ bridge, registry, view: createView(stage), config, stats });
   new Hud(document.getElementById('hud'), { session, bridge, registry, prefix: config.prefix });
   if (bridgeKind === 'dev') mountDevConsole(document.body, bridge);
 

@@ -36,17 +36,21 @@ export const DEFAULT_CONFIG = {
   predictions: true,
   predictionSeconds: 60,
   overSeconds: 15,         // how long the winner screen shows before moving on
-  afterGame: 'menu',       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
+  afterGame: 'menu',
+  statsCooldownMs: 2500,   // !bgstats turns the page at most this often       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
 };
 
 export class Session extends Emitter {
-  constructor({ bridge, registry, view = null, config = {}, scheduler = globalThis }) {
+  constructor({ bridge, registry, view = null, config = {}, scheduler = globalThis, stats = null }) {
     super();
     this.bridge = bridge;
     this.registry = registry;
     this.view = view;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.sched = scheduler;
+    this.stats = stats;       // StatsStore or null
+    this.statsIndex = 0;      // which leaderboard page the game select screen shows
+    this.statsTurnedAt = 0;
 
     this.phase = 'menu';
     this.manifest = null;
@@ -74,6 +78,7 @@ export class Session extends Emitter {
     const cmd = parseCommand(msg, this.config.prefix);
     if (!cmd) return;
     if (cmd.kind === 'admin') return this.#admin(cmd, msg);
+    if (cmd.kind === 'stats') return this.#statsCommand(msg.user, cmd.arg);
 
     switch (this.phase) {
       case 'menu':
@@ -107,7 +112,8 @@ export class Session extends Emitter {
     if (sub === 'crowd' && this.phase === 'lobby') return this.setCrowdSeat(arg);
     if (sub === 'bot' && this.phase === 'lobby') return this.setBotSeat(arg);
     if (sub === 'bots' && this.phase === 'lobby') return this.setBotFill(arg);
-    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg menu`);
+    if (sub === 'stats') return this.#statsAdmin(arg);
+    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg stats reset [game] confirm, !bg menu`);
   }
 
   say(text) {
@@ -304,6 +310,8 @@ export class Session extends Emitter {
     }
 
     this.activeSeatIdx = this.seats.map((s, i) => (s.occupant ? i : -1)).filter((i) => i !== -1);
+    // Everyone seated as a human now counts as having played, even if they leave later.
+    this.participants = this.seats.filter((s) => s.occupant?.type === 'human').map((s) => ({ id: s.occupant.user.id, name: s.occupant.user.name }));
     this.rng = createRng();
     this.game = this.module.createGame({
       seats: this.activeSeatIdx.map((i) => this.seats[i].id),
@@ -481,6 +489,7 @@ export class Session extends Emitter {
     this.phase = 'over';
     this.emit('phase', this.phase);
     this.emit('gameOver', { winner: draw ? null : winner, draw, ranking: ranking.map((g) => this.seats[this.activeSeatIdx[g]]) });
+    this.#recordStats(winner, draw);
     if (draw) {
       this.say(`🤝 ${this.manifest.name} ends in a draw!${this.prediction ? ' Prediction refunded.' : ''}`);
       this.#cancelPrediction();
@@ -494,6 +503,62 @@ export class Session extends Emitter {
       if (this.config.afterGame === 'menu') this.toMenu();
       else this.openLobby(this.manifest.id, this.mode?.id);
     });
+  }
+
+  // ───────────────────────────── stats ─────────────────────────────
+
+  #recordStats(winnerSeat, draw) {
+    if (!this.stats || !this.participants?.length) return;
+    const o = winnerSeat?.occupant;
+    // A player who left was replaced by a bot: the win goes to nobody.
+    const winnerId = !draw && o?.type === 'human' ? o.user.id : null;
+    this.stats.record({ gameId: this.manifest.id, players: this.participants, winnerId, draw });
+    if (winnerId) {
+      const s = this.stats.data.players[winnerId];
+      if (s?.streak >= 2) this.say(`🔥 ${s.name} is on a ${s.streak}-win streak!`);
+    }
+    this.emit('stats', this.statsView());
+  }
+
+  // What the game select screen shows: all pages + the current one.
+  statsView() {
+    if (!this.stats) return null;
+    const pages = this.stats.pages(this.registry.list);
+    this.statsIndex = Math.min(this.statsIndex, pages.length - 1);
+    return { pages, index: this.statsIndex };
+  }
+
+  // !bgstats → next page (game select screen); !bgstats <game|overall|streak> → that page;
+  // !bgstats me → your own numbers in chat.
+  #statsCommand(user, arg) {
+    if (!this.stats) return;
+    if (arg === 'me') {
+      return this.say(this.stats.summary(user.id, this.registry.list) ?? `${user.name}: no finished games yet. Play one!`);
+    }
+    if (this.phase !== 'menu') return;
+    const now = Date.now();
+    if (now - this.statsTurnedAt < this.config.statsCooldownMs) return; // a flood of !bgstats only turns once
+    this.statsTurnedAt = now;
+    const pages = this.stats.pages(this.registry.list);
+    const jump = arg ? pages.findIndex((p) => p.id === arg) : -1;
+    this.statsIndex = jump >= 0 ? jump : (this.statsIndex + 1) % pages.length;
+    this.emit('stats', { pages, index: this.statsIndex });
+  }
+
+  // !bg stats reset confirm | !bg stats reset <game> confirm
+  #statsAdmin(arg) {
+    if (!this.stats) return;
+    const words = (arg ?? '').split(/\s+/).filter(Boolean);
+    if (words[0] !== 'reset') return this.say(`Stats: ${this.config.prefix}bgstats (next page), ${this.config.prefix}bgstats me, ${this.config.prefix}bg stats reset [game] confirm`);
+    const confirmed = words.at(-1) === 'confirm';
+    const gameId = words.length >= 2 && words[1] !== 'confirm' ? words[1] : null;
+    if (gameId && !this.registry.get(gameId)) return this.say(`Unknown game "${gameId}".`);
+    const what = gameId ? `the ${this.registry.get(gameId).name} leaderboard` : 'ALL viewer stats';
+    if (!confirmed) return this.say(`This deletes ${what}. Type ${this.config.prefix}bg stats reset ${gameId ? `${gameId} ` : ''}confirm to do it.`);
+    this.stats.reset(gameId);
+    this.statsIndex = 0;
+    this.say(`Deleted ${what}.`);
+    this.emit('stats', this.statsView());
   }
 
   // ───────────────────────────── predictions ─────────────────────────────
