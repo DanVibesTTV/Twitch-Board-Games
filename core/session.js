@@ -37,7 +37,8 @@ export const DEFAULT_CONFIG = {
   predictionSeconds: 60,
   overSeconds: 15,         // how long the winner screen shows before moving on
   afterGame: 'menu',
-  statsCooldownMs: 2500,   // !bgstats turns the page at most this often       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
+  statsCooldownMs: 2500,   // !bgstats turns the page at most this often
+  lobbyReminders: [30, 10], // chat reminders this many seconds before the lobby closes       // 'menu' (back to game select) or 'lobby' (rematch of the same game)
 };
 
 export class Session extends Emitter {
@@ -71,6 +72,7 @@ export class Session extends Emitter {
   #busy;
   #starting = false;
   #timer = null;
+  #reminders = [];
   #token = 0; // invalidates stale timers/votes whenever the decision changes
 
   // ───────────────────────────── chat ─────────────────────────────
@@ -288,6 +290,27 @@ export class Session extends Emitter {
     this.emit('lobbyTimer', { endsAt, total: secs });
     const token = ++this.#token;
     this.#setTimer(secs * 1000, () => token === this.#token && this.start());
+    // "⏳ 10 s left…" in chat — skipped when the countdown is too short for it to make sense
+    for (const before of this.config.lobbyReminders ?? []) {
+      if (secs - before < 8) continue;
+      this.#reminders.push(this.sched.setTimeout(() => {
+        if (token === this.#token && this.phase === 'lobby') this.say(this.#reminderText(before));
+      }, (secs - before) * 1000));
+    }
+  }
+
+  #reminderText(secondsLeft) {
+    const p = this.config.prefix;
+    const name = `${this.manifest.name}${this.mode ? ` (${this.mode.name})` : ''}`;
+    let text;
+    if (this.#isDraw()) {
+      text = `⏳ ${secondsLeft}s left to enter ${name}! Type ${p}join (${this.entrants.size} entered)`;
+    } else {
+      const taken = this.seats.filter((s) => s.occupant && s.occupant.type !== 'reserved').length;
+      text = `⏳ ${secondsLeft}s left to join ${name}! Type ${p}join (${taken}/${this.manifest.players.max} seats taken)`;
+    }
+    if (this.#hostSeat()) text += ` · Streamer: type ${p}join`;
+    return text;
   }
 
   // ───────────────────────────── game ─────────────────────────────
@@ -648,5 +671,7 @@ export class Session extends Emitter {
   #clearTimer() {
     if (this.#timer != null) this.sched.clearTimeout(this.#timer);
     this.#timer = null;
+    for (const r of this.#reminders) this.sched.clearTimeout(r);
+    this.#reminders = [];
   }
 }

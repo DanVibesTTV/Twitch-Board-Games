@@ -4,42 +4,105 @@
   "tagline": "Race around a holo-wheel, answer questions, collect all the category wedges.",
   "version": "0.1.0",
   "coreVersion": "1.0.0",
-  "players": { "min": 2, "max": 6, "botFillTo": 3 },
-  "durationMinutes": [8, 40],
+  "players": {
+    "min": 2,
+    "max": 6,
+    "botFillTo": 3
+  },
+  "durationMinutes": [
+    8,
+    40
+  ],
   "needs": [],
   "thumbnail": "thumbnail.svg",
   "seats": [
-    { "id": "red", "name": "Red", "color": "#ff3b4e" },
-    { "id": "cyan", "name": "Cyan", "color": "#20e3ff" },
-    { "id": "white", "name": "White", "color": "#eef2ff" },
-    { "id": "lime", "name": "Lime", "color": "#b8ff2e" },
-    { "id": "steel", "name": "Steel", "color": "#8fa3c7" },
-    { "id": "rose", "name": "Rose", "color": "#ff8fc8" }
+    {
+      "id": "red",
+      "name": "Red",
+      "color": "#ff3b4e"
+    },
+    {
+      "id": "cyan",
+      "name": "Cyan",
+      "color": "#20e3ff"
+    },
+    {
+      "id": "white",
+      "name": "White",
+      "color": "#eef2ff"
+    },
+    {
+      "id": "lime",
+      "name": "Lime",
+      "color": "#b8ff2e"
+    },
+    {
+      "id": "steel",
+      "name": "Steel",
+      "color": "#8fa3c7"
+    },
+    {
+      "id": "rose",
+      "name": "Rose",
+      "color": "#ff8fc8"
+    }
   ],
   "modes": [
     {
       "id": "standard",
       "name": "Standard",
       "description": "Collect 4 wedges, then answer a final question at the hub (about 20 minutes).",
-      "rules": { "wedgesToWin": 4, "finalQuestion": true }
+      "rules": {
+        "wedgesToWin": 4,
+        "finalQuestion": true
+      }
     },
     {
       "id": "quick",
       "name": "Quick",
       "description": "First to 3 wedges wins, no final question (about 8 minutes).",
-      "rules": { "wedgesToWin": 3, "finalQuestion": false }
+      "rules": {
+        "wedgesToWin": 3,
+        "finalQuestion": false
+      },
+      "howTo": [
+        "Type !roll, then pick where to move with !1, !2… (numbers appear on the board).",
+        "Answer with !1–!4 within 30 seconds. Right: roll again. Wrong: next player.",
+        "Answer right on a category HQ (big hexagon) to earn its wedge.",
+        "The first player with 3 wedges wins. No final question."
+      ]
     },
     {
       "id": "classic",
       "name": "Classic",
       "description": "All 6 wedges plus the final question, like the board game (about 40 minutes).",
-      "rules": { "wedgesToWin": 6, "finalQuestion": true }
+      "rules": {
+        "wedgesToWin": 6,
+        "finalQuestion": true
+      }
     }
   ],
   "commands": [
-    { "cmd": "!roll", "help": "roll the die on your turn" },
-    { "cmd": "!1 … !n", "help": "pick where to move, then answer (30 s per question)" },
-    { "cmd": "!bg cat <1-6> <category>", "help": "mods: change a category (e.g. !bg cat 6 sports)" }
+    {
+      "cmd": "!roll",
+      "help": "roll the die on your turn"
+    },
+    {
+      "cmd": "!1 … !n",
+      "help": "pick where to move, then answer (30 s per question)"
+    },
+    {
+      "cmd": "!bg cat <1-6> <category>",
+      "help": "mods: change a category (e.g. !bg cat 6 sports)"
+    }
   ],
-  "defaultRules": { "answerSeconds": 30 }
+  "defaultRules": {
+    "answerSeconds": 30
+  },
+  "howTo": [
+    "Type !roll, then pick where to move with !1, !2… (numbers appear on the board).",
+    "Answer with !1–!4 within 30 seconds. Right: roll again. Wrong: next player.",
+    "Answer right on a category HQ (big hexagon) to earn its wedge.",
+    "Collect the wedges, get back to the hub and answer the final question to win."
+  ]
 }

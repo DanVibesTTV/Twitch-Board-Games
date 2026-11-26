@@ -4,20 +4,36 @@
   "tagline": "Drop discs, line up four. A quick 1-on-1 duel with three ways to play.",
   "version": "0.1.0",
   "coreVersion": "1.0.0",
-  "players": { "min": 2, "max": 2 },
-  "durationMinutes": [3, 8],
+  "players": {
+    "min": 2,
+    "max": 2
+  },
+  "durationMinutes": [
+    3,
+    8
+  ],
   "needs": [],
   "thumbnail": "thumbnail.svg",
   "seats": [
-    { "id": "red", "name": "Red", "color": "#e8343f" },
-    { "id": "yellow", "name": "Yellow", "color": "#ffc21a" }
+    {
+      "id": "red",
+      "name": "Red",
+      "color": "#e8343f"
+    },
+    {
+      "id": "yellow",
+      "name": "Yellow",
+      "color": "#ffc21a"
+    }
   ],
   "modes": [
     {
       "id": "streamer",
       "name": "Duel the Streamer",
       "description": "The streamer plays Red. Type !join to enter the draw: one random challenger plays Yellow.",
-      "seats": { "red": "host" },
+      "seats": {
+        "red": "host"
+      },
       "entry": "draw"
     },
     {
@@ -30,12 +46,29 @@
       "id": "chat",
       "name": "Chat vs Streamer",
       "description": "The streamer plays Red, and chat votes on every Yellow move.",
-      "seats": { "red": "host", "yellow": "crowd" }
+      "seats": {
+        "red": "host",
+        "yellow": "crowd"
+      }
     }
   ],
   "commands": [
-    { "cmd": "!1 … !7", "help": "drop your disc into that column" },
-    { "cmd": "!bg mode <streamer|duel|chat>", "help": "mods: switch mode in the lobby" }
+    {
+      "cmd": "!1 … !7",
+      "help": "drop your disc into that column"
+    },
+    {
+      "cmd": "!bg mode <streamer|duel|chat>",
+      "help": "mods: switch mode in the lobby"
+    }
   ],
-  "defaultRules": { "botDepth": 5, "botMistakes": 0.1 }
+  "defaultRules": {
+    "botDepth": 5,
+    "botMistakes": 0.1
+  },
+  "howTo": [
+    "Drop a disc with !1–!7, the number of the column.",
+    "Line up four of your discs: across, down or diagonal.",
+    "Full columns are greyed out. A full board without four is a draw."
+  ]
 }
