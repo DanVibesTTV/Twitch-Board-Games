@@ -148,7 +148,9 @@ export function createRenderer(stage, { seats }) {
       for (let i = 0; i < 5; i++) {
         const badge = badgeSprite(String(i + 1), '#1d1934', color);
         badge.scale.setScalar(0.5);
-        badge.position.set(0, DIE + 0.5, 0);
+        // The camera looks down almost vertically, so a badge straight above a die covers its face.
+        // Pushing it back (−z) puts it above the die on screen instead.
+        badge.position.set(0, DIE * 0.6, -DIE * 1.05);
         dice[i].group.add(badge);
         decor.push(badge);
       }
