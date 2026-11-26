@@ -205,3 +205,58 @@ test('overlay storage: loads from the companion, copies old browser data over on
   storage.setItem('boardgames.stats.v1', '{"new":2}');
   assert.deepEqual(sent.at(-1), ['PUT', 'boardgames.stats.v1', '{"new":2}']);
 });
+
+test('twitch bot account: posts as the bot, its echoes are ignored, falls back to the streamer, rejects the same account', async () => {
+  const store = await tempStore();
+  await store.saveAuth({ access_token: 'main', refresh_token: 'r' });
+  await store.saveAuth({ access_token: 'bot', refresh_token: 'rb' }, 'bot');
+  const posts = [];
+  let botBroken = false;
+  let botIsMain = false;
+  const fetch = async (url, opts = {}) => {
+    const token = (opts.headers?.Authorization ?? '').split(' ')[1];
+    if (url.endsWith('/validate')) {
+      return new Response(JSON.stringify(token === 'bot' && !botIsMain
+        ? { login: 'dansbot', user_id: '9', scopes: ['user:write:chat'] }
+        : { login: 'dan', user_id: '1', scopes: ['user:read:chat', 'user:write:chat', 'channel:manage:predictions'] }));
+    }
+    if (url.endsWith('/chat/messages')) {
+      const body = JSON.parse(opts.body);
+      if (token === 'bot' && botBroken) return new Response(JSON.stringify({ message: 'banned' }), { status: 403 });
+      posts.push([token, body.sender_id, body.broadcaster_id]);
+      return new Response(JSON.stringify({ data: [{ message_id: `m${posts.length}`, is_sent: true }] }));
+    }
+    return new Response('{}');
+  };
+  const t = new Twitch({ store, clientId: 'cid', fetch, WebSocketImpl: FakeWS, log: { warn() {}, error() {} } });
+  const chats = [];
+  t.on('chat', (c) => chats.push(c.text));
+  await t.start();
+  assert.equal(t.botState.state, 'connected');
+  assert.equal(t.botState.login, 'dansbot');
+  FakeWS.last.receive({ metadata: { message_type: 'session_welcome' }, payload: { session: { id: 'S', keepalive_timeout_seconds: 30 } } });
+  await new Promise((r) => setTimeout(r, 10));
+
+  const r = await t.sendChat('Lobby open, type !join');
+  assert.equal(r.from, 'dansbot');
+  assert.deepEqual(posts.at(-1), ['bot', '9', '1'], 'sent with the bot token, bot as sender, into the streamer channel');
+  FakeWS.last.receive({ metadata: { message_type: 'notification', subscription_type: 'channel.chat.message' },
+    payload: { event: { message_id: 'm1', chatter_user_id: '9', chatter_user_login: 'dansbot', message: { text: 'Lobby open, type !join' }, badges: [] } } });
+  assert.deepEqual(chats, [], 'bot echo dropped');
+
+  botBroken = true;
+  const r2 = await t.sendChat('Your turn');
+  assert.equal(r2.from, 'dan', 'fell back to the streamer account');
+  assert.match(t.botState.detail, /failed/);
+  t.close();
+
+  // Logging the bot in with the streaming account is refused.
+  botIsMain = true;
+  await store.saveAuth({ access_token: 'bot', refresh_token: 'rb' }, 'bot');
+  const t2 = new Twitch({ store, clientId: 'cid', fetch, WebSocketImpl: FakeWS, log: { warn() {}, error() {} } });
+  await t2.start();
+  assert.equal(t2.botState.state, 'none');
+  assert.match(t2.botState.detail, /private/);
+  assert.equal(await store.loadAuth('bot'), null);
+  t2.close();
+});

@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.8)
+# Twitch Board Games (v0.9)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -20,7 +20,7 @@ Paste that URL plus the settings below into an OBS Browser Source. Every push to
 ### Option B: companion app (runs on your PC)
 A small program that serves the overlay, logs in to Twitch itself and keeps everything on your PC. You need it if you use neither Lumia Stream nor Streamer.bot but still want chat messages and predictions. It's also handy alongside them:
 
-- **Twitch login built in:** read and write chat, plus Twitch predictions (Affiliate/Partner), with no extra app.
+- **Twitch login built in:** read and write chat, plus Twitch predictions (Affiliate/Partner), with no extra app. Optionally connect your **bot account** so game messages come from the bot instead of you.
 - **Stats in a file** on your PC instead of the browser source's cache, with daily backups.
 - **Updates from this repo:** the app checks GitHub for new versions and installs them with one click. Your stats and login are kept.
 
@@ -150,5 +150,6 @@ tests/       npm test  (logic + session, runs in Node)
 ## Status
 - **Tested live:** Ludo and Tubes & Teleporters in OBS. Twitch predictions work through both Lumia Stream and Streamer.bot.
 - Lumia has no whisper command, so future hidden-information games will need Streamer.bot for private hands.
-- **New in 0.8:** the companion app (Twitch login, stats file, one-click updates). Needs a live test with a real Twitch login.
+- **Companion app** (0.8): Twitch login, stats file, one-click updates, OBS URL builder. Tested live.
+- **New in 0.9:** optional bot account for the companion's chat messages (first release delivered through the in-app updater).
 - **Planned:** packaging the companion as a desktop program (`.exe`), and a Twitch Extension with a hosted backend for hidden-information games.

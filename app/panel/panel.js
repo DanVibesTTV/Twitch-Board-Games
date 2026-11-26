@@ -6,6 +6,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 
 let status = null;
 let login = null;   // pending device code { user_code, verification_uri }
+let botLogin = null;
 let version = null;
 
 // ---- OBS URL options (defaults match main.js; only changed values go into the URL) ----
@@ -117,6 +118,7 @@ async function refresh() {
   $('set-twitchClientId').value = status.settings.twitchClientId;
   $('set-updateRepo').value = status.settings.updateRepo;
   renderTwitch(status.twitch);
+  renderBot(status.twitchBot);
   renderUpdate(status.update);
 }
 
@@ -159,6 +161,40 @@ function renderTwitch(st) {
   $('logout')?.addEventListener('click', async () => {
     if (!confirm('Log out of Twitch? The overlay stops reading chat until you log in again.')) return;
     await api('/api/twitch/logout', {}).catch((err) => toast(err.message));
+  });
+}
+
+function renderBot(st) {
+  const el = $('bot-body');
+  if (!status?.twitch?.login || status.clientIdSource === 'none') { el.innerHTML = ''; return; }
+  let html = '<h3>Bot account <span class="muted">(optional)</span></h3>';
+  if (st.state === 'connected') {
+    html += `<div class="state connected"><i></i>Game messages are posted by <b>${esc(st.login)}</b></div>`;
+    if (st.detail) html += `<p class="muted">${esc(st.detail)}</p>`;
+    html += `<p class="muted">Tip: make <b>${esc(st.login)}</b> a moderator (<code>/mod ${esc(st.login)}</code>) so slow mode, follower-only mode and link filters don't block it. If the bot can't post, messages come from your account instead.</p>
+      <div class="actions"><button id="bot-logout">Disconnect bot</button></div>`;
+  } else if (st.state === 'logging-in' && botLogin) {
+    html += `<p><b>Open this link in a private/incognito window</b> (so you can log in as the bot, not as yourself), log in with the bot account and confirm the code:</p>
+      <div class="copy"><input id="bot-link" readonly value="${esc(botLogin.verification_uri)}"><button data-copy="bot-link">Copy link</button></div>
+      <div class="code">${esc(botLogin.user_code)}</div>
+      <div class="actions"><button id="bot-cancel">Cancel</button></div>`;
+  } else {
+    html += `<p class="muted">Game messages are posted from your own account (<b>${esc(status.twitch.login)}</b>). Connect a second Twitch account to have them come from your bot instead. The bot only needs permission to send chat messages.</p>`;
+    if (st.detail) html += `<p class="note">${esc(st.detail)}</p>`;
+    html += '<div class="actions"><button class="twitch" id="bot-login">Connect bot account</button></div>';
+  }
+  el.innerHTML = html;
+  $('bot-login')?.addEventListener('click', async (ev) => {
+    ev.target.disabled = true;
+    try {
+      botLogin = await api('/api/twitch/bot/login', {});
+      renderBot({ state: 'logging-in' });
+    } catch (err) { toast(err.message); ev.target.disabled = false; }
+  });
+  $('bot-cancel')?.addEventListener('click', () => { botLogin = null; api('/api/twitch/bot/logout', {}).catch(() => {}); });
+  $('bot-logout')?.addEventListener('click', async () => {
+    if (!confirm('Disconnect the bot account? Game messages will come from your own account again.')) return;
+    await api('/api/twitch/bot/logout', {}).catch((err) => toast(err.message));
   });
 }
 
@@ -234,7 +270,12 @@ events.addEventListener('hello', (ev) => {
 events.addEventListener('twitch', (ev) => {
   const st = JSON.parse(ev.data);
   if (st.state !== 'logging-in') login = null;
-  if (status) { status.twitch = st; renderTwitch(st); }
+  if (status) { status.twitch = st; renderTwitch(st); renderBot(status.twitchBot); }
+});
+events.addEventListener('twitchBot', (ev) => {
+  const st = JSON.parse(ev.data);
+  if (st.state !== 'logging-in') botLogin = null;
+  if (status) { status.twitchBot = st; renderBot(st); }
 });
 events.addEventListener('update', (ev) => renderUpdate(JSON.parse(ev.data)));
 
