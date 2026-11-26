@@ -38,7 +38,7 @@ Add a **Browser Source** (1920×1080). Use the hosted URL (or your own / `http:/
 |---|---|
 | No extra app (chat read-only) | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=irc&channel=YOURNAME` |
 | Lumia Stream | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=lumia&token=YOUR_LUMIA_API_TOKEN` |
-| Streamer.bot | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=streamerbot` (see `docs/STREAMERBOT.md`) |
+| Streamer.bot | `https://danvibesttv.github.io/Twitch-Board-Games/?bridge=streamerbot` (one-time setup of 2 actions: `docs/STREAMERBOT.md`) |
 
 The hosted page still talks to Lumia / Streamer.bot on your own PC (`127.0.0.1`), so nothing goes through GitHub. Keep the Lumia token out of screenshots: it is part of the URL.
 
@@ -73,12 +73,13 @@ bridges/     irc-anon, lumia, streamerbot, dev  → one interface (bridge.js)
 renderer/    stage (render-on-demand), unfold (folding board), dice, pieces, view
 ui/          HUD (game browser, seats, turn, moves, log, winner)
 games/       add-ons: index.json + one folder per game
-docs/        GAME_API.md (writing a game), STREAMERBOT.md
+docs/        GAME_API.md (writing a game), STREAMERBOT.md (Streamer.bot setup)
+streamerbot/ C# code for the Streamer.bot action (+ import string once exported)
 tests/       npm test  (logic + session, runs in Node)
 ```
 
 ## Status / to-do
 - The 3D rendering (unfold, pawns, dice) is written but has **not been checked in a real browser yet**. Expect some tuning of the camera, sizes and timings on the first run.
 - The Lumia chat format and prediction commands follow Lumia's developer docs and need a live test. Lumia offers no whisper command.
-- The Streamer.bot action pack needs to be built and exported (see `docs/STREAMERBOT.md`).
+- Streamer.bot: the 2-action setup is documented and the C# is ready. It still needs a test against a live Streamer.bot, then an exported import string committed as `streamerbot/BoardGames.import.txt`.
 - Planned: a local Node companion app (Twitch OAuth), and a Twitch Extension with a hosted backend for hidden-information games.
