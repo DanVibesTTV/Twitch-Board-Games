@@ -12,49 +12,14 @@ const BASE = 0.3;                 // frame sits on its feet this high
 const HOLE_R = 0.4;
 const DISC_R = 0.44;
 const DISC_T = 0.2;
-const PLATE_Z = 0.14; // plates close together, so you never look through a hole onto the back plate
-const FRAME_COLOR = '#1f4fd1';
+const DEPTH = 0.32;   // the frame is one solid piece this thick, with real holes cut through it
+const BEVEL = 0.035;  // rounded edges on the frame and around every hole
+const PLATE_Z = DEPTH / 2;
+const FRAME_COLOR = '#2a5be6';
 
 const holeX = (c) => (c - (COLS - 1) / 2) * CELL;
 const holeY = (r) => BASE + 0.35 + 0.5 + r * CELL;
 const TOP = BASE + H;
-
-function frameTexture() {
-  const k = 128;
-  const cv = document.createElement('canvas');
-  cv.width = Math.round(W * k);
-  cv.height = Math.round(H * k);
-  const g = cv.getContext('2d');
-  const grd = g.createLinearGradient(0, 0, cv.width, cv.height);
-  grd.addColorStop(0, '#3d6cf0');
-  grd.addColorStop(1, '#1a3fae');
-  g.fillStyle = grd;
-  g.fillRect(0, 0, cv.width, cv.height);
-  for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS; r++) {
-      const x = (0.35 + 0.5 + c) * k;
-      const y = cv.height - (0.35 + 0.5 + r) * k;
-      // bevel ring: dark lower-right, light upper-left
-      const ring = g.createLinearGradient(x - 0.5 * k, y - 0.5 * k, x + 0.5 * k, y + 0.5 * k);
-      ring.addColorStop(0, 'rgba(255,255,255,0.45)');
-      ring.addColorStop(1, 'rgba(0,0,40,0.55)');
-      g.fillStyle = ring;
-      g.beginPath(); g.arc(x, y, (HOLE_R + 0.06) * k, 0, Math.PI * 2); g.fill();
-    }
-  }
-  g.globalCompositeOperation = 'destination-out';
-  for (let c = 0; c < COLS; c++) {
-    for (let r = 0; r < ROWS; r++) {
-      g.beginPath();
-      g.arc((0.35 + 0.5 + c) * k, cv.height - (0.35 + 0.5 + r) * k, HOLE_R * k, 0, Math.PI * 2);
-      g.fill();
-    }
-  }
-  const tex = new THREE.CanvasTexture(cv);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return tex;
-}
 
 function discMaterials(color) {
   const cv = document.createElement('canvas');
@@ -117,7 +82,6 @@ export function createRenderer(stage, { seats }) {
   const discGeo = new THREE.CylinderGeometry(DISC_R, DISC_R, DISC_T, 36);
   discGeo.rotateX(Math.PI / 2);
   const mats = colors.map(discMaterials);
-  const frameTex = frameTexture();
   let labelCanvas = labelTexture(new Array(COLS).fill('idle'), '#fff');
   const labelTex = new THREE.CanvasTexture(labelCanvas);
   labelTex.colorSpace = THREE.SRGBColorSpace;
@@ -128,28 +92,39 @@ export function createRenderer(stage, { seats }) {
   const fillLight = new THREE.DirectionalLight(0xbfd4ff, 0.45);
   fillLight.position.set(6, 2, 8);
 
+  // One solid frame: a rectangle with 42 round holes, extruded and bevelled. Real geometry instead
+  // of two flat plates, so holes have inner walls and nothing can show through them but discs.
   function buildFrame() {
-    const plateGeo = new THREE.PlaneGeometry(W, H);
-    const front = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
-      map: frameTex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.32, metalness: 0.05,
-    }));
-    front.position.set(0, BASE + H / 2, PLATE_Z);
-    // The back plate is only seen through the holes: darker, so it reads as the inside of the frame.
-    const back = new THREE.Mesh(plateGeo, new THREE.MeshStandardMaterial({
-      map: frameTex, color: 0x4a5a90, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.6,
-    }));
-    back.position.set(0, BASE + H / 2, -PLATE_Z);
-    group.add(front, back);
-    const edgeMat = new THREE.MeshStandardMaterial({ color: FRAME_COLOR, roughness: 0.5 });
-    const side = new THREE.BoxGeometry(0.14, H, PLATE_Z * 2 + 0.04);
-    for (const x of [-W / 2, W / 2]) {
-      const m = new THREE.Mesh(side, edgeMat);
-      m.position.set(x, BASE + H / 2, 0);
-      group.add(m);
+    const shape = new THREE.Shape();
+    const x0 = -W / 2 + BEVEL;
+    const x1 = W / 2 - BEVEL;
+    const y0 = BASE + BEVEL;
+    const y1 = BASE + H - BEVEL;
+    shape.moveTo(x0, y0);
+    shape.lineTo(x1, y0);
+    shape.lineTo(x1, y1);
+    shape.lineTo(x0, y1);
+    shape.lineTo(x0, y0);
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        const hole = new THREE.Path();
+        // the bevel grows the outline and shrinks the holes, so cut them a bit bigger
+        hole.absarc(holeX(c), holeY(r), HOLE_R + BEVEL, 0, Math.PI * 2, true);
+        shape.holes.push(hole);
+      }
     }
-    const bottom = new THREE.Mesh(new THREE.BoxGeometry(W + 0.14, 0.14, PLATE_Z * 2 + 0.04), edgeMat);
-    bottom.position.set(0, BASE + 0.07, 0);
-    group.add(bottom);
+    const geo = new THREE.ExtrudeGeometry(shape, {
+      depth: DEPTH - BEVEL * 2,
+      bevelEnabled: true,
+      bevelThickness: BEVEL,
+      bevelSize: BEVEL,
+      bevelSegments: 2,
+      curveSegments: 28,
+    });
+    geo.translate(0, 0, -(DEPTH - BEVEL * 2) / 2);
+    const edgeMat = new THREE.MeshStandardMaterial({ color: FRAME_COLOR, roughness: 0.32, metalness: 0.05 });
+    const frame = new THREE.Mesh(geo, edgeMat);
+    group.add(frame);
     const footGeo = new THREE.BoxGeometry(0.5, BASE + 0.1, 2.0);
     for (const x of [-W / 2 - 0.05, W / 2 + 0.05]) {
       const f = new THREE.Mesh(footGeo, edgeMat);
@@ -246,7 +221,6 @@ export function createRenderer(stage, { seats }) {
       keyLight.removeFromParent();
       fillLight.removeFromParent();
       discGeo.dispose();
-      frameTex.dispose();
       labelTex.dispose();
       stage.invalidate();
     },
