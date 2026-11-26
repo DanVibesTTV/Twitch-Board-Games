@@ -1,4 +1,4 @@
-# Twitch Board Games (v0.9)
+# Twitch Board Games (v0.10)
 
 Chat-playable board games as a stream overlay: a Three.js board with 3D pieces and dice, a DOM HUD, and connections to Twitch through Lumia Stream, Streamer.bot or plain anonymous chat. Games plug in as add-ons and show up in the built-in game browser.
 
@@ -24,11 +24,19 @@ A small program that serves the overlay, logs in to Twitch itself and keeps ever
 - **Stats in a file** on your PC instead of the browser source's cache, with daily backups.
 - **Updates from this repo:** the app checks GitHub for new versions and installs them with one click. Your stats and login are kept.
 
+**Windows (no install needed):**
+1. Download **`StreamBoardGames-vX.Y.Z-windows-x64.zip`** from the latest [release](https://github.com/DanVibesTTV/Twitch-Board-Games/releases/latest) and extract it somewhere permanent, e.g. `Documents\StreamBoardGames`.
+2. Double-click **`StreamBoardGames.exe`**. The first time, Windows may show *"Windows protected your PC"* because the exe isn't code-signed: click **More info → Run anyway**.
+3. The control panel opens in your browser (`http://127.0.0.1:8765/panel/`). Click **Log in with Twitch** and confirm the code on twitch.tv.
+4. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`**. The panel's OBS section has checkboxes and fields for the game options and builds the URL for you (copy button included).
+
+Keep the exe in its folder: it loads the game files next to it, and updates replace those files.
+
+**macOS/Linux (or Windows with Node.js):**
 1. Install **Node.js 22 or newer** ([how](#installing-nodejs)).
-2. Download this repo (green **Code** button → **Download ZIP**) and extract it somewhere permanent, e.g. `Documents\Twitch Board Games`.
-3. **Windows:** double-click **`Start Board Games.bat`**. **macOS/Linux:** open a terminal in the folder and run `npm start` (same as `node app/companion.mjs`).
-4. The control panel opens in your browser (`http://127.0.0.1:8765/panel/`). Click **Log in with Twitch**, confirm the code on twitch.tv, done.
-5. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`**. The panel's OBS section has checkboxes and fields for the game options and builds the URL for you (copy button included).
+2. Download this repo (green **Code** button → **Download ZIP**) and extract it somewhere permanent.
+3. Open a terminal in the folder and run `npm start` (same as `node app/companion.mjs`). On Windows you can double-click **`Start Board Games.bat`** instead.
+4. Continue with steps 3–4 above.
 
 Keep the app's window open while you stream. Details, troubleshooting and how updates work: [`docs/COMPANION.md`](docs/COMPANION.md).
 
@@ -37,7 +45,7 @@ Keep the app's window open while you stream. Details, troubleshooting and how up
 - **Or just serve the folder** without the companion's extras: `node tools/serve.mjs` (or `npm run serve`), then use `http://127.0.0.1:8765/` instead of the GitHub URL. ES modules don't load from `file://`, so the folder has to be served over http.
 
 ### Installing Node.js
-Only needed for the companion app or `tools/serve.mjs` (and `npm test` if you work on the code). The hosted URL and GitHub Pages forks need nothing installed.
+Not needed for the Windows exe. Only needed for running the companion app from the source files, or `tools/serve.mjs` (and `npm test` if you work on the code). The hosted URL and GitHub Pages forks need nothing installed.
 
 You need version **22 or newer**; just pick the current **LTS** ("Long Term Support") release.
 
@@ -151,5 +159,6 @@ tests/       npm test  (logic + session, runs in Node)
 - **Tested live:** Ludo and Tubes & Teleporters in OBS. Twitch predictions work through both Lumia Stream and Streamer.bot.
 - Lumia has no whisper command, so future hidden-information games will need Streamer.bot for private hands.
 - **Companion app** (0.8): Twitch login, stats file, one-click updates, OBS URL builder. Tested live.
-- **New in 0.9:** optional bot account for the companion's chat messages (first release delivered through the in-app updater).
-- **Planned:** packaging the companion as a desktop program (`.exe`), and a Twitch Extension with a hosted backend for hidden-information games.
+- **Bot account** (0.9): optional bot for the companion's chat messages (first release delivered through the in-app updater). Tested live.
+- **New in 0.10:** Windows exe (`StreamBoardGames.exe`), so streamers don't need Node.js. Built and smoke-tested by GitHub Actions for every release.
+- **Planned:** a Twitch Extension with a hosted backend for hidden-information games.

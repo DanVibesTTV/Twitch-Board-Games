@@ -1,0 +1,67 @@
+# Builds the Windows download (StreamBoardGames.exe + program files as a zip) and smoke-tests it.
+# Runs on PRs that touch the companion, by hand from the Actions tab, and from release.yml,
+# which passes the release tag so the zip gets attached to that release.
+name: Build Windows exe
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'tools/build-exe.mjs'
+      - 'tools/zip.mjs'
+      - '.github/workflows/build-exe.yml'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      tag:
+        description: Release tag to attach the zip to
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26   # --build-sea needs Node 25.5+; this is also the Node version inside the exe
+      - run: npm test
+      - run: node tools/build-exe.mjs
+      - name: Smoke test the exe
+        shell: pwsh
+        run: |
+          $data = Join-Path $env:RUNNER_TEMP 'bg-data'
+          New-Item -ItemType Directory -Force $data | Out-Null
+          '{"autoCheck":false,"openPanel":false}' | Set-Content (Join-Path $data 'settings.json')
+          $env:BOARDGAMES_DATA = $data
+          $exe = Resolve-Path 'dist/StreamBoardGames/StreamBoardGames.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '18765','--no-panel' -PassThru -NoNewWindow -RedirectStandardOutput out.log -RedirectStandardError err.log
+          $status = $null
+          for ($i = 0; $i -lt 30 -and -not $status; $i++) {
+            Start-Sleep -Seconds 1
+            try { $status = Invoke-RestMethod -Uri 'http://127.0.0.1:18765/api/status' -Headers @{ 'X-BoardGames' = '1' } } catch {}
+          }
+          $page = (Invoke-WebRequest -Uri 'http://127.0.0.1:18765/panel/' -UseBasicParsing).StatusCode
+          Get-Process StreamBoardGames -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Content out.log, err.log -ErrorAction SilentlyContinue
+          if (-not $status) { throw 'exe did not answer on port 18765' }
+          $expected = (Get-Content package.json | ConvertFrom-Json).version
+          if ($status.version -ne $expected) { throw "exe reports version $($status.version), expected $expected" }
+          if ($page -ne 200) { throw "panel returned $page" }
+          Write-Host "exe OK: v$($status.version), data folder $($status.dataDir)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StreamBoardGames-windows
+          path: dist/*.zip
+      - name: Attach to the release
+        if: inputs.tag != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.tag }}" dist/*.zip --clobber
