@@ -35,7 +35,8 @@ test('companion server: serves the overlay and panel, guards the API, stores ove
     assert.equal((await get(port, '/api/chat', { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: '{"text":"hi"}' })).status, 403);
     const st = JSON.parse((await get(port, '/api/status', { headers: H })).body);
     assert.equal(st.dataDir, dir);
-    assert.equal(st.twitch.state, 'error', 'no client ID in tests');
+    assert.equal(st.twitch.state, 'logged-out', 'fresh data folder: not logged in yet');
+    assert.equal(st.clientIdSource, 'app');
 
     assert.equal((await get(port, '/api/kv/boardgames.stats.v1', { method: 'PUT', headers: H, body: JSON.stringify({ value: '{"a":1}' }) })).status, 200);
     assert.equal((await get(port, '/api/kv/notours', { method: 'PUT', headers: H, body: '{"value":"x"}' })).status, 400);
