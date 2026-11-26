@@ -34,8 +34,8 @@ export class Hud {
     this.status = { state: 'connecting', detail: '' };
 
     session.on('phase', (p) => this.#phase(p));
-    session.on('seats', (seats) => { this.seats = seats; this.#renderSeats(); });
-    session.on('lobbyTimer', (t) => this.#renderLobby(t));
+    session.on('seats', (seats) => { this.seats = seats; this.#renderSeats(); if (session.phase === 'lobby') this.#renderLobby(this.lobbyTimer); });
+    session.on('lobbyTimer', (t) => { this.lobbyTimer = t; this.#renderLobby(t); });
     session.on('decision', (d) => this.#renderDecision(d));
     session.on('votes', (tally) => this.#renderVotes(tally));
     session.on('log', ({ seat, text }) => this.#log(text, seat?.color));
@@ -56,7 +56,7 @@ export class Hud {
       this.logLines = [];
       this.#renderLog();
     }
-    if (phase === 'lobby') this.#renderLobby(null);
+    if (phase === 'lobby') { this.lobbyTimer = null; this.#renderLobby(null); }
     if (phase === 'playing') this.main.innerHTML = '<div class="muted">Setting up the board…</div>';
   }
 
@@ -112,7 +112,7 @@ export class Hud {
     this.main.innerHTML = `
       <div class="big">Join the game!</div>
       <p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(m.seats[0].id)}</b> to pick a color.</p>
-      <p class="muted">${m.players.min}–${m.players.max} players${this.s.config.fillBots ? ' · empty seats become bots' : ''}</p>
+      <p class="muted">${m.players.min}–${m.players.max} players${this.s.botFillTo ? ` · bots fill up to ${this.s.botFillTo} seats` : ''}</p>
       ${t ? `<div class="label">Starting in</div>${this.#timerBar(t.endsAt, t.total, true)}` : '<div class="muted">Countdown starts with the first player.</div>'}
       <div class="help">${(m.commands ?? []).map((c) => `<div><b>${esc(c.cmd)}</b> ${esc(c.help)}</div>`).join('')}</div>`;
   }

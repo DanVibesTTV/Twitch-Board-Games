@@ -21,13 +21,16 @@ const PIPS = {
   6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
 };
 
-function faceTexture(value, pipColor) {
+let glowPips = false;
+function faceTexture(value, pipColor, faceColor, onePipColor) {
   const cv = document.createElement('canvas');
   cv.width = cv.height = 128;
   const g = cv.getContext('2d');
-  g.fillStyle = '#fbf8f1';
+  g.fillStyle = faceColor;
   g.fillRect(0, 0, 128, 128);
-  g.fillStyle = value === 1 ? '#d3313a' : pipColor;
+  g.fillStyle = value === 1 ? onePipColor : pipColor;
+  g.shadowColor = value === 1 ? onePipColor : pipColor;
+  g.shadowBlur = glowPips ? 14 : 0;
   for (const [x, y] of PIPS[value]) {
     g.beginPath();
     g.arc(64 + x * 32, 64 + y * 32, value === 1 ? 17 : 12, 0, Math.PI * 2);
@@ -39,10 +42,17 @@ function faceTexture(value, pipColor) {
 }
 
 export class Die {
-  constructor(stage, { size = 0.9, pipColor = '#1d1a26' } = {}) {
+  // Options: faceColor/pipColor/onePipColor; glow: true draws glowing pips (neon style).
+  constructor(stage, { size = 0.9, pipColor = '#1d1a26', faceColor = '#fbf8f1', onePipColor = '#d3313a', glow = false } = {}) {
     this.stage = stage;
     this.size = size;
-    const mats = FACE_VALUES.map((v) => new THREE.MeshStandardMaterial({ map: faceTexture(v, pipColor), roughness: 0.45 }));
+    glowPips = glow;
+    const mats = FACE_VALUES.map((v) => new THREE.MeshStandardMaterial({
+      map: faceTexture(v, pipColor, faceColor, onePipColor),
+      roughness: 0.45,
+      ...(glow ? { emissive: 0xffffff, emissiveMap: faceTexture(v, pipColor, '#000000', onePipColor), emissiveIntensity: 0.9 } : {}),
+    }));
+    glowPips = false;
     this.mesh = new THREE.Mesh(new RoundedBoxGeometry(size, size, size, 3, size * 0.16), mats);
     this.shadow = blobShadow(size * 0.85);
     this.group = new THREE.Group();
