@@ -38,6 +38,18 @@ jobs:
         run: |
           mkdir _site
           cp -r index.html main.js core bridges renderer ui games sounds _site/
+      # The Android app's over-the-air updates: the same files the APK ships (Three.js bundled,
+      # local bridge default) plus version.json and files.json with SHA-256 checksums.
+      # Phones only switch to them when package.json's version is newer than theirs.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build the app bundle (/app/)
+        working-directory: mobile
+        run: |
+          npm install --no-audit --no-fund
+          node build-www.mjs
+          cp -r www ../_site/app
       - uses: actions/configure-pages@v5
       # The artifact name includes the attempt number: artifacts from a failed first attempt stay
       # attached to the run, and "Re-run" would otherwise find two artifacts with the same name.
