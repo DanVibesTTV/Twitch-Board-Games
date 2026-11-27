@@ -1,0 +1,17 @@
+{
+  "appId": "com.danvibes.streamboardgames",
+  "appName": "Stream Board Games",
+  "webDir": "www",
+  "backgroundColor": "#15131c",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": true
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK",
+      "hidden": true
+    }
+  }
+}

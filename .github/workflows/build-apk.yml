@@ -1,0 +1,86 @@
+# Builds the Android test app (debug-signed APK) and offers it as a download on the workflow run.
+# Runs on PRs and pushes to main that touch the games or the app shell, and by hand from the
+# Actions tab. Install: download the "stream-board-games-apk" artifact, unzip, open the .apk on
+# the phone (allow "install unknown apps" for your browser or file manager once).
+#
+# The Android project (mobile/android) is generated fresh on every run by "npx cap add android"
+# and patched by mobile/prepare-android.mjs, so nothing generated lives in the repo.
+name: Build Android APK
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'main.js'
+      - 'core/**'
+      - 'bridges/**'
+      - 'renderer/**'
+      - 'ui/**'
+      - 'games/**'
+      - 'sounds/**'
+      - 'mobile/**'
+      - 'app/panel/icon.png'
+      - 'package.json'
+      - '.github/workflows/build-apk.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'main.js'
+      - 'core/**'
+      - 'bridges/**'
+      - 'renderer/**'
+      - 'ui/**'
+      - 'games/**'
+      - 'sounds/**'
+      - 'mobile/**'
+      - 'app/panel/icon.png'
+      - 'package.json'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm test
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21    # Capacitor 8 needs JDK 21; the Android SDK is preinstalled on ubuntu-latest
+      - name: Install Capacitor + Three.js
+        working-directory: mobile
+        run: npm install --no-audit --no-fund
+      - name: Build web files
+        working-directory: mobile
+        run: node build-www.mjs
+      - name: Generate and patch the Android project
+        working-directory: mobile
+        run: |
+          npx cap add android
+          node prepare-android.mjs
+          npx cap sync android
+      - name: Build debug APK
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Name the APK after the version
+        id: apk
+        run: |
+          version=$(node -p "require('./package.json').version")
+          name="StreamBoardGames-v${version}-${GITHUB_RUN_NUMBER}-debug.apk"
+          mkdir -p dist
+          cp mobile/android/app/build/outputs/apk/debug/app-debug.apk "dist/${name}"
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stream-board-games-apk
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30

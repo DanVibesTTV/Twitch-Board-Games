@@ -1,0 +1,4 @@
+# Generated: rebuilt from the repo by build-www.mjs / "npx cap add android" (see README.md)
+node_modules/
+www/
+android/

@@ -1,5 +1,7 @@
 // DOM HUD over the 3D canvas: game browser, lobby, seats, turn/timer, move list, log, toasts.
 // Listens to Session events only — never touches game logic.
+// Touch mode (the phone app): anything with data-cmd is tappable and sends that command
+// ("|" separates several), exactly as if it was typed in chat.
 
 const el = (tag, cls, html) => {
   const e = document.createElement(tag);
@@ -10,8 +12,9 @@ const el = (tag, cls, html) => {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export class Hud {
-  constructor(root, { session, bridge, registry, prefix = '!' }) {
+  constructor(root, { session, bridge, registry, prefix = '!', touch = null }) {
     this.s = session;
+    this.touch = touch; // { send(text) } or null
     this.bridge = bridge;
     this.registry = registry;
     this.p = prefix;
@@ -31,6 +34,13 @@ export class Hud {
     this.questionBox = el('section', 'hud-question');
     this.lobbyStage = el('section', 'hud-lobby');
     root.append(this.side, this.menu, this.lobbyStage, this.questionBox, this.toasts, this.banner);
+    if (touch) {
+      root.addEventListener('click', (e) => {
+        const target = e.target.closest?.('[data-cmd]');
+        if (!target || target.classList.contains('disabled')) return;
+        for (const cmd of target.dataset.cmd.split('|')) touch.send(cmd.trim());
+      });
+    }
 
     this.seats = [];
     this.entrants = [];
@@ -65,6 +75,7 @@ export class Hud {
   #phase(phase) {
     this.root.dataset.phase = phase;
     this.banner.classList.remove('show');
+    delete this.banner.dataset.cmd;
     this.#hideQuestion();
     clearInterval(this.lobbyInfoTimer);
     if (phase === 'lobby') this.lobbyInfoTimer = setInterval(() => this.#renderLobbyInfo(), 1500);
@@ -83,6 +94,7 @@ export class Hud {
     const m = this.s.manifest;
     const st = this.status;
     this.header.innerHTML = `
+      ${this.touch && this.s.phase !== 'menu' ? '<button class="hud-back" data-cmd="!bg stop" aria-label="Back to game select">✕</button>' : ''}
       <div class="title">${esc(this.s.phase === 'menu' || !m ? 'Board Games' : m.name)}</div>
       <div class="conn conn-${esc(st.state)}" title="${esc(st.detail)}"><i></i>${esc(st.detail || st.state)}</div>`;
   }
@@ -92,6 +104,7 @@ export class Hud {
     const caps = this.bridge.capabilities;
     const head = el('div', 'menu-head', vote
       ? `<h1>Vote for the next game</h1><p>Type <b>${this.p}1</b>, <b>${this.p}2</b> … in chat</p>${this.#timerBar(vote.endsAt, vote.total)}`
+      : this.touch ? '<h1>Pick a game</h1><p>Tap a game to play against bots</p>'
       : `<h1>Pick a game</h1><p>Streamer/mods: <b>${this.p}bg play &lt;game&gt;</b> or <b>${this.p}bg vote</b></p>`);
     // One row of cards; once they don't fit it becomes an endless right-to-left carousel.
     const carousel = el('div', 'menu-carousel');
@@ -101,6 +114,7 @@ export class Hud {
     list.forEach((m, i) => {
       const ok = this.registry.isPlayable(m, caps);
       const card = el('article', `game-card${ok ? '' : ' disabled'}`);
+      if (this.touch && ok && !vote) card.dataset.cmd = `${this.p}bg play ${m.id}`;
       card.innerHTML = `
         ${vote ? `<div class="vote-num">${this.p}${i + 1}<span class="vote-count" data-i="${i}">0</span></div>` : ''}
         <div class="thumb">${m.thumbnailUrl ? `<img src="${esc(m.thumbnailUrl)}" alt="">` : ''}</div>
@@ -109,7 +123,7 @@ export class Hud {
           <p>${esc(m.tagline ?? '')}</p>
           <div class="meta">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${m.durationMinutes ? ` · ${m.durationMinutes[0]}–${m.durationMinutes[1]} min` : ''}</div>
           ${m.modes?.length ? `<div class="modes">${m.modes.map((md) => `<span title="${esc(md.description ?? '')}">${esc(md.name)}</span>`).join('')}</div>` : ''}
-          ${ok ? `<code>${this.p}bg play ${esc(m.id)}</code>` : `<div class="needs">Needs: ${esc(this.registry.missing(m, caps).join(', '))}</div>`}
+          ${!ok ? `<div class="needs">Needs: ${esc(this.registry.missing(m, caps).join(', '))}</div>` : this.touch ? '' : `<code>${this.p}bg play ${esc(m.id)}</code>`}
         </div>`;
       grid.append(card);
     });
@@ -122,7 +136,7 @@ export class Hud {
   #fitCarousel() {
     const carousel = this.menu.querySelector('.menu-carousel');
     const track = carousel?.querySelector('.menu-track');
-    if (!track) return;
+    if (!track || this.touch) return; // touch: the row scrolls with a swipe instead
     track.querySelectorAll('.clone').forEach((c) => c.remove());
     carousel.classList.remove('scrolling');
     const cards = [...track.children];
@@ -141,6 +155,7 @@ export class Hud {
   #renderStats(view) {
     if (!view) { this.statsBox.style.display = 'none'; return; }
     this.statsBox.style.display = '';
+    if (this.touch) this.statsBox.dataset.cmd = `${this.p}bgstats`;
     const { pages, index } = view;
     const page = pages[index] ?? pages[0];
     const medals = ['🥇', '🥈', '🥉'];
@@ -155,7 +170,7 @@ export class Hud {
         <div class="dots">${pages.map((_, i) => `<i class="${i === index ? 'on' : ''}"></i>`).join('')}</div>
       </div>
       <ol class="board" key="${esc(page.id)}">${rows}</ol>
-      <div class="stats-hint"><b>${this.p}bgstats</b> next page · <b>${this.p}bgstats me</b> your stats</div>`;
+      <div class="stats-hint">${this.touch ? 'Tap for the next page' : `<b>${this.p}bgstats</b> next page · <b>${this.p}bgstats me</b> your stats`}</div>`;
   }
 
   #renderSeats() {
@@ -165,7 +180,7 @@ export class Hud {
     this.seatsBox.innerHTML = this.seats.map((s) => {
       const o = s.occupant;
       const draw = this.s.mode?.entry === 'draw' && this.s.phase === 'lobby';
-      const who = !o ? `<span class="muted">${draw ? '🎲 drawn at random' : `${this.p}join ${esc(s.id)}`}</span>`
+      const who = !o ? `<span class="muted">${this.touch ? 'open' : draw ? '🎲 drawn at random' : `${this.p}join ${esc(s.id)}`}</span>`
         : o.type === 'reserved' ? `⭐ Streamer <span class="muted">· type ${this.p}join</span>`
         : o.type === 'human' ? `${o.host ? '⭐ ' : ''}${esc(o.user.name)}`
         : o.type === 'crowd' ? '👥 Chat vote'
@@ -183,6 +198,14 @@ export class Hud {
     const draw = mode?.entry === 'draw';
     const openSeat = this.seats.find((x) => !x.occupant) ?? m.seats[0];
     const recent = this.entrants.slice(-6).map((u) => esc(u.name)).join(', ');
+    if (this.touch) {
+      this.main.innerHTML = `<p>Choose the options on the left, then tap <b>Play</b>.</p>
+        <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`} · empty seats become bots</p>
+        <div class="lobby-info"></div>`;
+      this.#renderLobbyInfo();
+      this.#renderLobbyStage(t);
+      return;
+    }
     this.main.innerHTML = `
       ${draw
         ? `<p>Type <b>${this.p}join</b> to enter. <span class="entrants"><b>${this.entrants.length}</b> entered${recent ? `: ${this.entrants.length > 6 ? '… ' : ''}${recent}` : ''}</span></p>`
@@ -219,13 +242,33 @@ export class Hud {
         </div>
         ${steps.length ? `<h3>How to play</h3><ol class="ls-steps">${steps.map((s) => `<li><span>${highlightCommands(esc(s))}</span></li>`).join('')}</ol>` : ''}
         ${playerCmds.length && !steps.length ? `<div class="ls-cmds">${playerCmds.map((c) => `<span><b>${esc(c.cmd)}</b> ${esc(c.help)}</span>`).join('')}</div>` : ''}
-        <div class="ls-cta">
+        ${this.touch ? this.#touchLobbyControls() : `<div class="ls-cta">
           <div class="ls-join">Type <b>${this.p}join</b> ${draw ? 'to enter the draw' : 'to play'}<div class="ls-count-label">${count}</div></div>
           <div class="ls-countdown">${t ? `<div class="ls-secs" data-ends="${t.endsAt}">${Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000))}</div><div class="ls-sub">seconds</div>` : '<div class="ls-wait">Waiting for the first player…</div>'}</div>
-        </div>
-        ${modCmds.length ? `<div class="ls-mods">Mods: ${modCmds.map((c) => `<b>${esc(c.cmd)}</b> ${esc(c.help.replace(/^mods:\s*/, ''))}`).join(' · ')}</div>` : ''}
+        </div>`}
+        ${modCmds.length && !this.touch ? `<div class="ls-mods">Mods: ${modCmds.map((c) => `<b>${esc(c.cmd)}</b> ${esc(c.help.replace(/^mods:\s*/, ''))}`).join(' · ')}</div>` : ''}
       </div>`;
     this.#tickLobbyStage();
+  }
+
+  // Touch lobby: mode and player-count chips plus a big Play button (join + start right away).
+  // Modes that need chat (a crowd seat) or only draw viewers at random are left out on a phone.
+  #touchLobbyControls() {
+    const m = this.s.manifest;
+    const modes = (m.modes ?? []).filter((md) => !Object.values(md.seats ?? {}).includes('crowd') && !(md.entry === 'draw' && !Object.values(md.seats ?? {}).includes('host')));
+    const chip = (label, cmd, on) => `<button class="ls-chip${on ? ' on' : ''}" data-cmd="${esc(cmd)}">${esc(label)}</button>`;
+    const modeRow = modes.length > 1
+      ? `<div class="ls-row"><span class="ls-row-label">Mode</span>${modes.map((md) => chip(md.name, `${this.p}bg mode ${md.id}`, md.id === this.s.mode?.id)).join('')}</div>`
+      : '';
+    const min = Math.max(2, m.players.min);
+    const counts = [];
+    for (let n = min; n <= m.players.max; n++) counts.push(n);
+    const fill = Math.max(min, this.s.botFillTo ?? min);
+    const playersRow = counts.length > 1
+      ? `<div class="ls-row"><span class="ls-row-label">Players</span>${counts.map((n) => chip(String(n), `${this.p}bg bots ${n}`, n === fill)).join('')}</div>`
+      : '';
+    return `<div class="ls-touch">${modeRow}${playersRow}
+      <button class="ls-play" data-cmd="${this.p}join|${this.p}bg start">▶ Play</button></div>`;
   }
 
   // Updates the big countdown; the last 10 seconds pulse red.
@@ -260,7 +303,9 @@ export class Hud {
     else this.#hideQuestion();
     const who = occupant.type === 'human' ? occupant.user.name : occupant.type === 'crowd' ? 'Chat' : 'Bot';
     const showOptions = d.kind !== 'roll' || occupant.type !== 'bot';
-    const hint = d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
+    const tap = this.touch && occupant.type === 'human';
+    const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : 'Tap your move')
+      : d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
       : occupant.type === 'crowd' ? 'Chat votes — majority wins'
       : occupant.type === 'bot' ? 'Bot is thinking…'
       : d.kind === 'roll' ? `${who}, type <b>${this.p}roll</b>` : `${who}, type the number`;
@@ -269,25 +314,28 @@ export class Hud {
       <div class="prompt">${esc(d.prompt)}</div>
       ${this.#timerBar(payload.endsAt, payload.total)}
       <div class="hint">${hint}</div>
-      ${!showOptions || d.question ? '' : this.#optionList(d)}`;
+      ${!showOptions || d.question ? '' : this.#optionList(d, tap)}`;
   }
 
   // Hidden options (shortcuts) aren't listed; numbers stay their position in the full list.
   // 6+ options become a compact number grid unless the game asks for a list (decision.layout = 'list').
-  #optionList(d) {
+  // tap: the option is a button for the local player (shows the number without the prefix).
+  #optionList(d, tap = false) {
     const shown = d.options.map((o, i) => ({ o, i })).filter(({ o }) => !o.hidden);
+    const cmd = (i) => (tap ? ` data-cmd="${this.p}${i + 1}"` : '');
+    const num = (i) => (tap ? String(i + 1) : `${this.p}${i + 1}`);
     if (shown.length >= 6 && d.layout !== 'list') {
       return `<ol class="options grid">${shown.map(({ o, i }) => `
-        <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"><b>${this.p}${i + 1}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
+        <li class="${o.disabled ? 'disabled' : ''}" title="${esc(o.label)}"${cmd(i)}><b>${num(i)}</b><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
     }
-    return `<ol class="options">${shown.map(({ o, i }) => `
-        <li class="${o.disabled ? 'disabled' : ''}"><b>${this.p}${o.alias && shown.length === 1 ? esc(o.alias) : i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
+    return `<ol class="options${tap ? ' tap' : ''}">${shown.map(({ o, i }) => `
+        <li class="${o.disabled ? 'disabled' : ''}"${cmd(i)}><b>${tap && o.alias && shown.length === 1 ? '▶' : o.alias && shown.length === 1 ? `${this.p}${esc(o.alias)}` : num(i)}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>`;
   }
 
   // Big question card over the board. Answers: !1…!n; the result is revealed via game events.
   #renderQuestion({ decision: d, seat, occupant, endsAt, total }) {
     const q = d.question;
-    const who = occupant.type === 'human' ? `${esc(occupant.user.name)} answers` : occupant.type === 'crowd' ? 'Chat votes' : 'Bot answers';
+    const who = occupant.type === 'human' ? (occupant.user.id === this.bridge.user?.id ? 'Your turn' : `${esc(occupant.user.name)} answers`) : occupant.type === 'crowd' ? 'Chat votes' : 'Bot answers';
     this.questionBox.innerHTML = `
       <div class="q-card" style="--c:${esc(q.color)}">
         <div class="q-head">
@@ -298,7 +346,7 @@ export class Hud {
         </div>
         <div class="q-text">${esc(q.text)}</div>
         <ol class="q-answers n${d.options.length}">${d.options.map((o, i) => `
-          <li data-i="${i}"><b>${this.p}${i + 1}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>
+          <li data-i="${i}"${this.touch && occupant.type === 'human' ? ` data-cmd="${this.p}${i + 1}"` : ''}><b>${this.touch ? i + 1 : `${this.p}${i + 1}`}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>
         ${this.#timerBar(endsAt, total)}
         <div class="q-result"></div>
         <div class="q-foot">${q.source === 'opentdb' ? 'Question: Open Trivia Database (opentdb.com) · CC BY-SA 4.0' : 'Built-in question (Open Trivia DB not reachable)'}</div>
@@ -376,6 +424,8 @@ export class Hud {
   }
 
   #toast(text) {
+    // The lobby's chat announcements ("Type !join …") make no sense when you play by tapping.
+    if (this.touch && this.s.phase === 'lobby') return;
     const t = el('div', 'toast', esc(text));
     this.toasts.append(t);
     setTimeout(() => t.classList.add('out'), 4500);
@@ -393,6 +443,7 @@ export class Hud {
         <div class="muted">${ranking.map((s) => esc(labelOf(s))).join(' vs ')}</div>
       </div>`;
       this.banner.classList.add('show');
+      if (this.touch) this.banner.dataset.cmd = `${this.p}bg menu`;
       this.main.innerHTML = '<div class="muted">Back to game select shortly…</div>';
       return;
     }
@@ -404,6 +455,7 @@ export class Hud {
         <ol>${ranking.map((s, i) => `<li><span>${medals[i] ?? `${i + 1}.`}</span>${esc(labelOf(s))}</li>`).join('')}</ol>
       </div>`;
     this.banner.classList.add('show');
+    if (this.touch) this.banner.dataset.cmd = `${this.p}bg menu`;
     this.main.innerHTML = `<div class="muted">${this.s.config.afterGame === 'lobby' ? 'Rematch lobby opens shortly…' : 'Back to game select shortly…'}</div>`;
   }
 }

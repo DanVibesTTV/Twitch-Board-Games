@@ -12,8 +12,14 @@ export const ease = {
 
 const DEFAULT_FOV = 34;
 
+// True while a text field has focus (the on-screen keyboard is probably open).
+function isTyping() {
+  const a = typeof document !== 'undefined' ? document.activeElement : null;
+  return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+}
+
 export class Stage {
-  constructor(container, { fpsCap = 60, maxPixelRatio = 1.5, antialias = true } = {}) {
+  constructor(container, { fpsCap = 60, maxPixelRatio = 1.5, antialias = true, panelOffsets = true } = {}) {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias, alpha: true, powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio));
@@ -30,6 +36,7 @@ export class Stage {
     sun.position.set(-6, 14, 8);
     this.scene.add(sun);
 
+    this.panelOffsets = panelOffsets;
     this.minFrameMs = 1000 / fpsCap;
     this.anims = new Set();
     this.dirty = true;
@@ -38,19 +45,28 @@ export class Stage {
 
     this.resize = this.resize.bind(this);
     window.addEventListener('resize', this.resize);
+    // On phones the on-screen keyboard shrinks the window. While someone is typing, the board
+    // keeps its size (no jumping camera); the skipped resize is done once the input loses focus.
+    this.onFocusOut = () => setTimeout(() => { if (this.resizePending && !isTyping()) this.resize(); }, 250);
+    window.addEventListener('focusout', this.onFocusOut);
     this.resize();
   }
 
   // Positions the camera so a square board of `size` fits, viewed at `tilt` degrees from vertical.
   frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0] } = {}) {
     this.viewArgs = null;
+    // Games shift the board sideways (center x) to leave room for the HUD's side panel. When the
+    // stage itself already stops at the panel (touch layout), that shift is switched off.
+    if (!this.panelOffsets) center = [0, center[1], center[2]];
     this.camera.fov = DEFAULT_FOV;
     this.#applyShift(0);
     const vfov = THREE.MathUtils.degToRad(this.camera.fov);
     const aspect = this.camera.aspect;
     // Fit the board's diagonal-ish footprint in whichever dimension is tighter.
     const needH = size * (0.82 + 0.18 * Math.cos(THREE.MathUtils.degToRad(tilt))) / fill;
-    const needW = size / fill;
+    // Some games overfill (fill > 1) on purpose for a 16:9 screen. On a narrower touch stage
+    // that would cut the board off at the sides, so the width always fits there.
+    const needW = size / (this.panelOffsets ? fill : Math.min(fill, 0.9));
     const distH = needH / 2 / Math.tan(vfov / 2);
     const distW = needW / 2 / (Math.tan(vfov / 2) * aspect);
     const dist = Math.max(distH, distW);
@@ -68,6 +84,7 @@ export class Stage {
   // nothing gets viewed at an angle. A narrow fov keeps perspective distortion low.
   view({ width, height, center = [0, 0, 0], fov = 24, elevation = 6, fill = 0.9, shiftX = 0 }) {
     this.frameArgs = null;
+    if (!this.panelOffsets) shiftX = 0; // see frame()
     this.viewArgs = { width, height, center, fov, elevation, fill, shiftX };
     this.camera.fov = fov;
     const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
@@ -94,6 +111,9 @@ export class Stage {
   resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    // Only the height changed while typing → the keyboard opened or closed.
+    if (isTyping() && this.width === w && this.height) { this.resizePending = true; return; }
+    this.resizePending = false;
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
@@ -163,6 +183,7 @@ export class Stage {
 
   dispose() {
     window.removeEventListener('resize', this.resize);
+    window.removeEventListener('focusout', this.onFocusOut);
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }
