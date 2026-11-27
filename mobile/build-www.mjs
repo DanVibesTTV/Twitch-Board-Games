@@ -19,7 +19,7 @@ const out = join(here, 'www');
 const threeDir = resolve(process.env.THREE_DIR ?? join(here, 'node_modules', 'three'));
 
 // Everything the overlay loads at runtime (keep in sync with .github/workflows/pages.yml).
-const SITE = ['index.html', 'main.js', 'core', 'bridges', 'renderer', 'ui', 'games', 'sounds'];
+const SITE = ['index.html', 'main.js', 'core', 'bridges', 'net', 'renderer', 'ui', 'games', 'sounds'];
 // Only the Three.js files the games import.
 const THREE_FILES = ['build/three.module.js', 'examples/jsm/geometries/RoundedBoxGeometry.js'];
 

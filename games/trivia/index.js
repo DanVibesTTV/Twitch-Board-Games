@@ -9,6 +9,7 @@ import { QuestionBank, CATEGORIES } from './questions.js';
 
 export { createGame } from './logic.js';
 export { createRenderer } from './renderer.js';
+export { lan } from './lan.js'; // same-WiFi play: questions recorded on the host, replayed elsewhere
 
 let bank = null;
 const getBank = () => (bank ??= new QuestionBank());

@@ -12,9 +12,10 @@ const el = (tag, cls, html) => {
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 export class Hud {
-  constructor(root, { session, bridge, registry, prefix = '!', touch = null }) {
+  constructor(root, { session, bridge, registry, prefix = '!', touch = null, lan = null }) {
     this.s = session;
     this.touch = touch; // { send(text) } or null
+    this.lan = lan;     // ui/lan-ui.js (same-WiFi play) or null
     this.bridge = bridge;
     this.registry = registry;
     this.p = prefix;
@@ -37,6 +38,8 @@ export class Hud {
     root.append(this.side, this.menu, this.lobbyStage, this.questionBox, this.toasts, this.banner, this.rollButton);
     if (touch) {
       root.addEventListener('click', (e) => {
+        const lanAct = e.target.closest?.('[data-lan]');
+        if (lanAct) { this.lan?.action(lanAct.dataset.lan, lanAct); return; }
         const target = e.target.closest?.('[data-cmd]');
         if (!target || target.classList.contains('disabled')) return;
         for (const cmd of target.dataset.cmd.split('|')) touch.send(cmd.trim());
@@ -73,6 +76,18 @@ export class Hud {
     this.#phase(session.phase);
   }
 
+  // Re-draws what depends on outside state (same-WiFi status changes).
+  refresh() {
+    this.#renderHeader();
+    if (this.s.phase === 'menu' && !this.menuVote) this.#renderMenu(null);
+    if (this.s.phase === 'lobby') this.#renderLobby(this.lobbyTimer);
+  }
+
+  // Is this seat played on this phone? (In a WiFi game several phones show the same seats.)
+  #mine(occupant) {
+    return occupant?.type === 'human' && (!this.bridge.user || occupant.user?.id === this.bridge.user.id);
+  }
+
   #phase(phase) {
     this.root.dataset.phase = phase;
     if (phase !== 'playing') this.#renderRollButton(null);
@@ -96,17 +111,21 @@ export class Hud {
     const m = this.s.manifest;
     const st = this.status;
     this.header.innerHTML = `
-      ${this.touch && this.s.phase !== 'menu' ? '<button class="hud-back" data-cmd="!bg stop" aria-label="Back to game select">✕</button>' : ''}
+      ${this.touch && this.s.follower ? '<button class="hud-back" data-lan="leave" aria-label="Leave the WiFi game">✕</button>'
+        : this.touch && this.s.phase !== 'menu' ? '<button class="hud-back" data-cmd="!bg stop" aria-label="Back to game select">✕</button>' : ''}
       <div class="title">${esc(this.s.phase === 'menu' || !m ? 'Board Games' : m.name)}</div>
       <div class="conn conn-${esc(st.state)}" title="${esc(st.detail)}"><i></i>${esc(st.detail || st.state)}</div>`;
   }
 
   #renderMenu(vote) {
+    this.menuVote = vote;
     this.menu.innerHTML = '';
     const caps = this.bridge.capabilities;
+    const follower = this.s.follower;
     const head = el('div', 'menu-head', vote
       ? `<h1>Vote for the next game</h1><p>Type <b>${this.p}1</b>, <b>${this.p}2</b> … in chat</p>${this.#timerBar(vote.endsAt, vote.total)}`
-      : this.touch ? '<h1>Pick a game</h1><p>Tap a game to play against bots</p>'
+      : follower ? `<h1>WiFi game</h1><p>${this.lan?.waitingText ?? ''}</p>`
+      : this.touch ? `<h1>Pick a game</h1><p>${this.s.lanHost ? 'Tap a game — everyone connected plays' : 'Tap a game to play against bots'}</p>${this.lan?.menuHtml() ?? ''}`
       : `<h1>Pick a game</h1><p>Streamer/mods: <b>${this.p}bg play &lt;game&gt;</b> or <b>${this.p}bg vote</b></p>`);
     // One row of cards; once they don't fit it becomes an endless right-to-left carousel.
     const carousel = el('div', 'menu-carousel');
@@ -116,7 +135,7 @@ export class Hud {
     list.forEach((m, i) => {
       const ok = this.registry.isPlayable(m, caps);
       const card = el('article', `game-card${ok ? '' : ' disabled'}`);
-      if (this.touch && ok && !vote) card.dataset.cmd = `${this.p}bg play ${m.id}`;
+      if (this.touch && ok && !vote && !follower) card.dataset.cmd = `${this.p}bg play ${m.id}`;
       card.innerHTML = `
         ${vote ? `<div class="vote-num">${this.p}${i + 1}<span class="vote-count" data-i="${i}">0</span></div>` : ''}
         <div class="thumb">${m.thumbnailUrl ? `<img src="${esc(m.thumbnailUrl)}" alt="">` : ''}</div>
@@ -201,7 +220,7 @@ export class Hud {
     const openSeat = this.seats.find((x) => !x.occupant) ?? m.seats[0];
     const recent = this.entrants.slice(-6).map((u) => esc(u.name)).join(', ');
     if (this.touch) {
-      this.main.innerHTML = `<p>Choose the options on the left, then tap <b>Play</b>.</p>
+      this.main.innerHTML = `<p>${this.s.follower ? this.lan?.waitingText ?? '' : 'Choose the options on the left, then tap <b>Play</b>.'}</p>
         <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`} · empty seats become bots</p>
         <div class="lobby-info"></div>`;
       this.#renderLobbyInfo();
@@ -256,6 +275,7 @@ export class Hud {
   // Touch lobby: mode and player-count chips plus a big Play button (join + start right away).
   // Modes that need chat (a crowd seat) or only draw viewers at random are left out on a phone.
   #touchLobbyControls() {
+    if (this.s.follower) return `<div class="ls-touch"><div class="ls-waiting">⏳ ${this.lan?.waitingText ?? ''}</div></div>`;
     const m = this.s.manifest;
     const modes = (m.modes ?? []).filter((md) => !Object.values(md.seats ?? {}).includes('crowd') && !(md.entry === 'draw' && !Object.values(md.seats ?? {}).includes('host')));
     const chip = (label, cmd, on) => `<button class="ls-chip${on ? ' on' : ''}" data-cmd="${esc(cmd)}">${esc(label)}</button>`;
@@ -306,8 +326,9 @@ export class Hud {
     else this.#hideQuestion();
     const who = occupant.type === 'human' ? occupant.user.name : occupant.type === 'crowd' ? 'Chat' : 'Bot';
     const showOptions = d.kind !== 'roll' || occupant.type !== 'bot';
-    const tap = this.touch && occupant.type === 'human';
+    const tap = this.touch && this.#mine(occupant);
     const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : 'Tap a numbered piece on the board, or a move below')
+      : this.touch && occupant.type === 'human' ? `Waiting for ${esc(who)}…`
       : d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
       : occupant.type === 'crowd' ? 'Chat votes — majority wins'
       : occupant.type === 'bot' ? 'Bot is thinking…'
@@ -325,7 +346,7 @@ export class Hud {
   #renderRollButton(payload) {
     const btn = this.rollButton;
     const d = payload?.decision;
-    const i = this.touch && payload?.occupant?.type === 'human' && !d.question
+    const i = this.touch && this.#mine(payload?.occupant) && !d.question
       ? d.options.findIndex((o) => o.alias === 'roll' && !o.disabled && !o.hidden) : -1;
     if (i === -1) { btn.classList.remove('show'); delete btn.dataset.cmd; return; }
     // "Roll 3 dice again (1 left)  · !roll" → "Roll 3 dice again (1 left)"
@@ -366,7 +387,7 @@ export class Hud {
         </div>
         <div class="q-text">${esc(q.text)}</div>
         <ol class="q-answers n${d.options.length}">${d.options.map((o, i) => `
-          <li data-i="${i}"${this.touch && occupant.type === 'human' ? ` data-cmd="${this.p}${i + 1}"` : ''}><b>${this.touch ? i + 1 : `${this.p}${i + 1}`}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>
+          <li data-i="${i}"${this.touch && this.#mine(occupant) ? ` data-cmd="${this.p}${i + 1}"` : ''}><b>${this.touch ? i + 1 : `${this.p}${i + 1}`}</b><span>${esc(o.label)}</span><em class="vote-count" data-i="${i}"></em></li>`).join('')}</ol>
         ${this.#timerBar(endsAt, total)}
         <div class="q-result"></div>
         <div class="q-foot">${q.source === 'opentdb' ? 'Question: Open Trivia Database (opentdb.com) · CC BY-SA 4.0' : 'Built-in question (Open Trivia DB not reachable)'}</div>

@@ -93,9 +93,11 @@ export function startAppUpdates({ session, say = () => {}, onVersion = () => {},
   let busy = false;
   let readyPath = null;
 
+  // Switch only on the game select screen, and not while in a WiFi game (a reload would drop it).
+  const free = () => session.phase === 'menu' && !session.lanHost && !session.follower;
   const whenOnMenu = (fn) => {
-    if (session.phase === 'menu') return fn();
-    const off = session.on('phase', (ph) => { if (ph === 'menu') { off?.(); fn(); } });
+    if (free()) return fn();
+    const off = session.on('phase', () => { if (free()) { off?.(); fn(); } });
   };
 
   async function init() {

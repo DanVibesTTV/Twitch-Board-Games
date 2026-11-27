@@ -3,6 +3,12 @@
 // and talking to chat. Games only provide rules (see docs/GAME_API.md).
 //
 // Phases: 'menu' → 'lobby' → 'playing' → 'over' → back to 'lobby' (rematch) or 'menu'.
+//
+// Same-WiFi play (net/lan.js): the host's Session runs as usual and also emits 'lanStart'
+// (seed, seats, rules) and 'lanApply' (option index + RNG state) so the other phones can run an
+// identical copy of the game. Their Sessions are followers: no chat, no timers, no bots — they
+// only replay what the host sends (followMenu / followLobby / followStart / followApply /
+// followDecision).
 
 import { Emitter } from './emitter.js';
 import { parseCommand } from './commands.js';
@@ -42,8 +48,10 @@ export const DEFAULT_CONFIG = {
 };
 
 export class Session extends Emitter {
-  constructor({ bridge, registry, view = null, config = {}, scheduler = globalThis, stats = null }) {
+  constructor({ bridge, registry, view = null, config = {}, scheduler = globalThis, stats = null, follower = false }) {
     super();
+    this.follower = follower; // true on a phone that joined someone else's game
+    this.lanHost = false;     // true while this phone hosts a same-WiFi game (set by net/lan.js)
     this.bridge = bridge;
     this.registry = registry;
     this.view = view;
@@ -70,6 +78,7 @@ export class Session extends Emitter {
   }
 
   #busy;
+  #lanRecords = []; // game data the host recorded during a move (e.g. trivia questions), see game module `lan`
   #starting = false;
   #timer = null;
   #reminders = [];
@@ -78,6 +87,7 @@ export class Session extends Emitter {
   // ───────────────────────────── chat ─────────────────────────────
 
   handleChat(msg) {
+    if (this.follower) return; // a joined phone sends its commands to the host instead
     const cmd = parseCommand(msg, this.config.prefix);
     if (!cmd) return;
     if (cmd.kind === 'admin') return this.#admin(cmd, msg);
@@ -345,6 +355,7 @@ export class Session extends Emitter {
     this.participants = this.seats.filter((s) => s.occupant?.type === 'human').map((s) => ({ id: s.occupant.user.id, name: s.occupant.user.name }));
     this.rng = createRng();
     const rules = { ...(this.manifest.defaultRules ?? {}), ...(this.mode?.rules ?? {}) };
+    this.rules = rules;
     // Optional async setup (e.g. waiting for trivia questions). Never blocks for long.
     let ctx = null;
     if (this.module.prepare) {
@@ -355,12 +366,29 @@ export class Session extends Emitter {
       this.#starting = false;
       if (this.phase !== 'lobby') return; // stopped while loading
     }
+    // Hosting on WiFi: a game whose setup data can't be rebuilt on other phones (trivia's live
+    // question bank) records what it draws, and the records travel with each move.
+    this.#lanRecords = [];
+    if (this.lanHost && this.module.lan?.hostCtx) ctx = this.module.lan.hostCtx(ctx, (r) => { this.#lanRecords.push(r); return r; });
+    const rngStart = this.rng.getState?.();
     this.game = this.module.createGame({
       seats: this.activeSeatIdx.map((i) => this.seats[i].id),
       rng: this.rng,
       rules,
       ctx: ctx ?? null,
     });
+    if (this.lanHost) {
+      this.emit('lanStart', {
+        gameId: this.manifest.id,
+        modeId: this.mode?.id ?? null,
+        rngState: rngStart,
+        rules,
+        activeSeatIdx: this.activeSeatIdx,
+        seats: this.seats,
+        ctxSpec: this.module.lan?.spec?.(ctx) ?? null,
+        records: this.#lanRecords.splice(0),
+      });
+    }
     this.phase = 'playing';
     this.emit('phase', this.phase);
     this.#emitSeats();
@@ -520,8 +548,11 @@ export class Session extends Emitter {
     this.decision = null;
     this.emit('decision', null);
     let result;
+    const rngState = this.rng?.getState?.();
+    this.#lanRecords = [];
     try {
       result = this.game.apply(index);
+      if (this.lanHost) this.emit('lanApply', { index, rngState, records: this.#lanRecords.splice(0) });
     } catch (err) {
       // Rejected move: restore the turn so the game never stalls.
       console.error('[session] game.apply failed', err);
@@ -547,6 +578,7 @@ export class Session extends Emitter {
     this.phase = 'over';
     this.emit('phase', this.phase);
     this.emit('gameOver', { winner: draw ? null : winner, draw, ranking: ranking.map((g) => this.seats[this.activeSeatIdx[g]]) });
+    if (this.follower) return; // the host records stats and decides what comes next
     this.#recordStats(winner, draw);
     if (draw) {
       this.say(`🤝 ${this.manifest.name} ends in a draw!${this.prediction ? ' Prediction refunded.' : ''}`);
@@ -561,6 +593,94 @@ export class Session extends Emitter {
       if (this.config.afterGame === 'menu') this.toMenu();
       else this.openLobby(this.manifest.id, this.mode?.id);
     });
+  }
+
+  // ───────────────────────────── follower (joined phone) ─────────────────────────────
+  // Each returns a promise; net/lan.js runs them strictly one after another.
+
+  followMenu() {
+    this.#clearTimer();
+    this.#teardownGame();
+    this.gameVote = null;
+    if (this.phase !== 'menu') { this.phase = 'menu'; this.emit('phase', this.phase); }
+  }
+
+  async #followGame(gameId, modeId) {
+    const manifest = this.registry.get(gameId);
+    if (!manifest) throw new Error(`Unknown game "${gameId}" — is this app up to date?`);
+    if (this.manifest?.id !== gameId || !this.module) {
+      this.manifest = manifest;
+      this.module = await this.registry.load(gameId);
+    }
+    this.mode = (manifest.modes ?? []).find((m) => m.id === modeId) ?? null;
+  }
+
+  async followLobby({ gameId, modeId, seats, botFillTo }) {
+    if (this.phase === 'playing' || this.phase === 'over') this.#teardownGame();
+    await this.#followGame(gameId, modeId);
+    this.seats = seats;
+    this.botFillTo = botFillTo ?? 0;
+    if (this.phase !== 'lobby') { this.phase = 'lobby'; this.emit('phase', this.phase); }
+    this.#emitSeats();
+  }
+
+  async followStart({ gameId, modeId, rngState, rules, activeSeatIdx, seats, ctxSpec, records = [] }) {
+    this.#teardownGame();
+    await this.#followGame(gameId, modeId);
+    this.seats = seats;
+    this.activeSeatIdx = activeSeatIdx;
+    this.rules = rules;
+    this.rng = createRng();
+    this.rng.setState(rngState);
+    this.#lanRecords = [...records];
+    const ctx = this.module.lan?.clientCtx?.(ctxSpec, () => this.#lanRecords.shift()) ?? null;
+    this.game = this.module.createGame({ seats: activeSeatIdx.map((i) => seats[i].id), rng: this.rng, rules, ctx });
+    this.phase = 'playing';
+    this.emit('phase', this.phase);
+    this.#emitSeats();
+    this.#busy = true;
+    try {
+      await withTimeout(this.view?.mount?.(this.module, this.game, activeSeatIdx.map((i) => seats[i])), 20000, 'board intro');
+    } catch (err) { console.error('[session] view mount failed', err); }
+    this.#busy = false;
+  }
+
+  // The host started waiting for a decision (ms: time left on the host's clock).
+  followDecision({ ms, total }) {
+    if (this.phase !== 'playing' || !this.game) return;
+    const d = this.game.decision();
+    if (!d) return;
+    this.decision = d;
+    const seat = this.seats[this.activeSeatIdx[d.seat]];
+    this.emit('decision', { decision: d, seat, occupant: seat.occupant, endsAt: Date.now() + Math.max(0, ms), total });
+    this.view?.decision?.(d, seat);
+  }
+
+  // The host applied option `index`. Throws if this copy of the game has drifted apart.
+  async followApply({ index, rngState, records = [] }) {
+    if (this.phase !== 'playing' || !this.game) return;
+    const d = this.game.decision();
+    if (!d) throw new Error('out of sync: no decision here');
+    if (rngState != null) this.rng.setState(rngState);
+    this.#lanRecords.push(...records);
+    this.decision = null;
+    this.emit('decision', null);
+    const result = this.game.apply(index);
+    const seat = this.seats[this.activeSeatIdx[d.seat]];
+    for (const line of result.log ?? []) this.emit('log', { seat, text: line });
+    this.#busy = true;
+    try {
+      this.emit('gameEvents', result.events ?? []);
+      await withTimeout(this.view?.present?.(result.events ?? [], this.game), 15000, 'move animation');
+    } catch (err) { console.error('[session] view present failed', err); }
+    this.#busy = false;
+    if (!this.game.decision()) this.#finish();
+  }
+
+  // Seats changed during a game (someone left and a bot took over).
+  followSeats(seats) {
+    this.seats = seats;
+    this.#emitSeats();
   }
 
   // ───────────────────────────── stats ─────────────────────────────
