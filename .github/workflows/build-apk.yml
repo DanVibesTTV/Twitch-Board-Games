@@ -67,9 +67,20 @@ jobs:
           npx cap add android
           node prepare-android.mjs
           npx cap sync android
+      # Gradle signs debug builds with ~/.android/debug.keystore. Every runner would create a new
+      # random one, and Android refuses to update an app whose signature changed, so all test
+      # builds use the fixed key from the repo (see mobile/test-signing/README.md).
+      - name: Use the fixed test signing key
+        run: mkdir -p ~/.android && cp mobile/test-signing/debug.keystore ~/.android/debug.keystore
       - name: Build debug APK
         working-directory: mobile/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
+      - name: Check the APK is signed with the test key
+        run: |
+          apk=mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          signer=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$signer" verify --print-certs "$apk" | tee certs.txt
+          grep -qi "8cc4124bd22ea01aad14df6f0cf5f9038971ba4f0901839c27c68dcc8b09ff82" certs.txt
       - name: Name the APK after the version
         id: apk
         run: |

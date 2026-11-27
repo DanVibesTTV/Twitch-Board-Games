@@ -12,9 +12,10 @@ empty seats are filled by bots. There is no chat and no Twitch connection.
 3. Copy the `.apk` to the phone and open it. Android asks once to allow installs from that app
    (browser / file manager).
 
-Test builds are **debug-signed**: a newer test build installs over an older one on the same phone
-as long as both came from CI runs of this repo. Before APKs are shared with other people we create
-a real signing key once and keep it as a GitHub secret (losing it means users must uninstall).
+Test builds are signed with the fixed test key in `test-signing/`, so a newer test build installs
+over an older one. (Builds made before that key existed were signed with a random key per run:
+uninstall that version once.) Before APKs are shared with other people we create a real signing
+key once and keep it as a GitHub secret (losing it means users must uninstall).
 
 ## Try it in a browser
 
