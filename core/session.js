@@ -93,6 +93,7 @@ export class Session extends Emitter {
 
   handleChat(msg) {
     if (this.follower) return; // a joined phone sends its commands to the host instead
+    this.#claimPlaceholder(msg.user);
     const cmd = parseCommand(msg, this.config.prefix);
     if (!cmd) return;
     if (cmd.kind === 'admin') return this.#admin(cmd, msg);
@@ -130,13 +131,15 @@ export class Session extends Emitter {
     if (sub === 'crowd' && this.phase === 'lobby') return this.setCrowdSeat(arg);
     if (sub === 'bot' && this.phase === 'lobby') return this.setBotSeat(arg);
     if (sub === 'bots' && this.phase === 'lobby') return this.setBotFill(arg);
+    if (sub === 'seat') return this.seatUser(cmd.rawArg ?? arg);
+    if (sub === 'kick') return this.kick(arg);
     if (sub === 'stats') return this.#statsAdmin(arg);
     if (this.phase === 'lobby' && this.module?.adminCommand?.(sub, arg, {
       say: (t) => this.say(t),
       prefix: this.config.prefix,
       refresh: () => this.emit('lobbyInfo'),
     })) return;
-    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg stats reset [game] confirm, !bg menu`);
+    this.say(`Board games: !bg play <${this.registry.list.map((m) => m.id).join('|')}> [mode], !bg mode <mode>, !bg vote, !bg start, !bg stop, !bg seat <seat> <username>, !bg kick <seat|username>, !bg crowd <seat>, !bg bot <seat>, !bg bots <total seats|0>, !bg stats reset [game] confirm, !bg menu`);
   }
 
   say(text) {
@@ -225,6 +228,7 @@ export class Session extends Emitter {
   join(user, wanted) {
     if (this.phase !== 'lobby') return;
     if (this.#seatOf(user) !== -1) return;
+    if (!this.#canSeePrivate(user)) return this.#noPrivateScreen(user.name);
     // The seat reserved for the streamer
     const host = this.#hostSeat();
     if (host && user.isBroadcaster) {
@@ -270,7 +274,7 @@ export class Session extends Emitter {
   }
 
   setCrowdSeat(arg) {
-    const seat = this.seats.find((s) => s.id === arg) ?? this.seats.find((s) => !s.occupant);
+    const seat = this.#findSeat(arg) ?? this.seats.find((s) => !s.occupant);
     if (!seat) return;
     seat.occupant = { type: 'crowd' };
     this.say(`${seat.name} is played by chat vote — everyone not seated can vote with ${this.config.prefix}1, ${this.config.prefix}2, …`);
@@ -288,10 +292,104 @@ export class Session extends Emitter {
   }
 
   setBotSeat(arg) {
-    const seat = this.seats.find((s) => s.id === arg) ?? this.seats.find((s) => !s.occupant);
+    const seat = this.#findSeat(arg) ?? this.seats.find((s) => !s.occupant);
     if (!seat) return;
     seat.occupant = { type: 'bot' };
     this.#emitSeats();
+  }
+
+  // "!bg seat 3 DanVibes" (or "@DanVibes", or a seat name like "red"): puts that Twitch user in
+  // the seat — for external queues (Lumia, Streamer.bot) and the streamer dock. The Session only
+  // knows a user's id once they chat, so the seat holds a placeholder until then
+  // (#claimPlaceholder). Works in the lobby, and mid-game for seats a bot is playing.
+  seatUser(arg) {
+    const p = this.config.prefix;
+    const [seatArg, rawLogin] = String(arg ?? '').trim().split(/\s+/);
+    const login = String(rawLogin ?? '').replace(/^@/, '');
+    const seat = this.#findSeat(seatArg?.toLowerCase());
+    if (!seat || !/^\w{1,25}$/.test(login)) return this.say(`Usage: ${p}bg seat <seat number or name> <username>`);
+    if (this.phase !== 'lobby' && this.phase !== 'playing') return;
+    const i = this.seats.indexOf(seat);
+    if (this.phase === 'playing') {
+      if (this.#gameSeatIndex(i) === -1) return this.say(`${seat.name} isn't part of this game.`);
+      if (seat.occupant?.type !== 'bot') return this.say(`${seat.name} is taken — only seats a bot plays can be filled during a game.`);
+    }
+    const key = login.toLowerCase();
+    const existing = this.seats.findIndex((s) => s.occupant?.type === 'human' && s.occupant.user.login?.toLowerCase() === key);
+    const user = existing !== -1 ? this.seats[existing].occupant.user
+      : { id: `pending:${key}`, login: key, name: login, isMod: false, isBroadcaster: false, pending: true };
+    if (!this.#canSeePrivate(user)) return this.#noPrivateScreen(user.name);
+    if (existing === i) return;
+    if (existing !== -1) {
+      if (this.phase === 'playing') return this.say(`${user.name} is already playing ${this.seats[existing].name}.`);
+      this.seats[existing].occupant = this.seats[existing].occupant.host ? { type: 'reserved', role: 'host' } : null;
+    }
+    const wasHost = seat.occupant?.type === 'reserved' || seat.occupant?.host;
+    seat.occupant = { type: 'human', user, ...(wasHost && this.phase === 'lobby' ? { host: true } : {}) };
+    this.entrants.delete(user.id);
+    this.#emitEntrants();
+    this.say(`${user.name} ${this.phase === 'playing' ? 'takes over' : 'is seated as'} ${seat.name}${user.pending ? ` — @${user.name}, say anything in chat to take it` : ''}.`);
+    this.#emitSeats();
+    if (this.phase === 'playing') {
+      if (!user.pending) this.participants?.push({ id: user.id, name: user.name });
+      if (this.decision?.seat === this.#gameSeatIndex(i) && !this.#busy) this.#runDecision();
+    } else this.#lobbyCountdown();
+  }
+
+  // "!bg kick 3" / "!bg kick red" / "!bg kick @someone": lobby → the seat is free again;
+  // during a game → a bot takes over the seat.
+  kick(arg) {
+    const key = String(arg ?? '').trim().replace(/^@/, '').toLowerCase();
+    if (!key) return this.say(`Usage: ${this.config.prefix}bg kick <seat number, seat name or username>`);
+    if (this.phase === 'lobby') {
+      const entrant = [...this.entrants.values()].find((u) => u.login?.toLowerCase() === key || u.name.toLowerCase() === key);
+      if (entrant) { this.entrants.delete(entrant.id); this.#emitEntrants(); }
+    }
+    const seat = this.#findSeat(key)
+      ?? this.seats.find((s) => s.occupant?.type === 'human' && (s.occupant.user.login?.toLowerCase() === key || s.occupant.user.name.toLowerCase() === key));
+    const occ = seat?.occupant;
+    if (!occ || occ.type === 'reserved' || (occ.type === 'bot' && this.phase !== 'lobby')) return;
+    const who = occ.type === 'human' ? occ.user.name : occ.type === 'crowd' ? 'Chat' : 'The bot';
+    if (this.phase === 'lobby') {
+      seat.occupant = occ.host ? { type: 'reserved', role: 'host' } : null;
+      this.say(`${who} was removed from ${seat.name}.`);
+      this.#emitSeats();
+    } else if (this.phase === 'playing') {
+      seat.occupant = { type: 'bot', replaced: occ.user?.name ?? who };
+      this.say(`${who} was removed — a bot takes over ${seat.name}.`);
+      this.#emitSeats();
+      if (this.decision?.seat === this.#gameSeatIndex(this.seats.indexOf(seat)) && !this.#busy) this.#runDecision();
+    }
+  }
+
+  // A user seated by name chats for the first time: the placeholder becomes the real user.
+  #claimPlaceholder(user) {
+    const login = user?.login?.toLowerCase();
+    if (!login) return;
+    for (const seat of this.seats) {
+      const o = seat.occupant;
+      if (o?.type !== 'human' || !o.user.pending || o.user.login !== login) continue;
+      o.user = user;
+      if (this.phase === 'playing' && !this.participants?.some((p) => p.id === user.id)) this.participants?.push({ id: user.id, name: user.name });
+      this.#emitSeats();
+    }
+  }
+
+  // Hidden-information games need a private screen for every human player. A bridge that can't
+  // give everyone one (the companion app: only the streamer, through the dock) says who it can.
+  #canSeePrivate(user) {
+    return !this.hidden || !this.bridge.privateViewFor || this.bridge.privateViewFor(user);
+  }
+
+  #noPrivateScreen(name) {
+    this.say(`${this.manifest.name} has secret cards, so it needs a private screen — for now only the streamer can play it (with the streamer dock), against bots. Sorry ${name}!`);
+  }
+
+  // Seat by number ("2"), id or name ("red").
+  #findSeat(arg) {
+    if (!arg) return null;
+    if (/^\d{1,2}$/.test(arg)) return this.seats[Number(arg) - 1] ?? null;
+    return this.seats.find((s) => s.id === arg || s.name.toLowerCase() === arg) ?? null;
   }
 
   #lobbyCountdown() {
@@ -357,7 +455,8 @@ export class Session extends Emitter {
 
     this.activeSeatIdx = this.seats.map((s, i) => (s.occupant ? i : -1)).filter((i) => i !== -1);
     // Everyone seated as a human now counts as having played, even if they leave later.
-    this.participants = this.seats.filter((s) => s.occupant?.type === 'human').map((s) => ({ id: s.occupant.user.id, name: s.occupant.user.name }));
+    // (Placeholders seated by name join the list once they chat.)
+    this.participants = this.seats.filter((s) => s.occupant?.type === 'human' && !s.occupant.user.pending).map((s) => ({ id: s.occupant.user.id, name: s.occupant.user.name }));
     this.rng = createRng();
     const rules = { ...(this.manifest.defaultRules ?? {}), ...(this.mode?.rules ?? {}) };
     this.rules = rules;
@@ -488,11 +587,12 @@ export class Session extends Emitter {
         this.#apply(this.#timeoutChoice());
       });
     }
+    this.decisionEndsAt = Date.now() + waitMs;
     this.emit('decision', {
       decision: d,
       seat,
       occupant: seat.occupant,
-      endsAt: Date.now() + waitMs,
+      endsAt: this.decisionEndsAt,
       total: waitMs / 1000,
     });
     this.view?.decision?.(d, seat, this.#shown());
@@ -622,6 +722,63 @@ export class Session extends Emitter {
     const game = this.game;
     const perspective = this.perspective;
     return { hidden: true, state: game.viewFor(perspective), viewFor: () => game.viewFor(perspective), decision: () => game.decision() };
+  }
+
+  // ───────────────────────────── streamer dock ─────────────────────────────
+
+  // Everything the streamer dock shows (see ui/dock-link.js), as plain data. This is the
+  // streamer's private screen: for hidden games it carries `viewFor(streamer's seat)` — the
+  // streamer's own cards, never anyone else's.
+  dockState() {
+    const m = this.manifest;
+    const seats = this.seats.map((s, i) => {
+      const o = s.occupant;
+      return {
+        n: i + 1, id: s.id, name: s.name,
+        type: o?.type ?? null,
+        label: o ? this.#seatLabel(s) : null,
+        user: o?.user ? { login: o.user.login ?? null, name: o.user.name, pending: !!o.user.pending } : null,
+        host: !!(o?.host || o?.type === 'reserved'),
+        active: this.phase === 'playing' || this.phase === 'over' ? this.#gameSeatIndex(i) !== -1 : true,
+      };
+    });
+    const state = {
+      prefix: this.config.prefix,
+      phase: this.phase,
+      game: m ? { id: m.id, name: m.name, hidden: this.hidden, min: m.players.min, max: m.players.max } : null,
+      mode: this.mode ? { id: this.mode.id, name: this.mode.name } : null,
+      modes: (m?.modes ?? []).map((x) => ({ id: x.id, name: x.name })),
+      games: this.registry.list.map((x) => ({ id: x.id, name: x.name, playable: this.registry.isPlayable(x, this.bridge.capabilities) })),
+      seats: this.phase === 'menu' ? [] : seats,
+      botFillTo: this.botFillTo ?? null,
+      entrants: [...this.entrants.values()].map((u) => u.name),
+      // seat number the streamer sits in (or null)
+      streamerSeat: (this.seats.findIndex((x) => x.occupant?.type === 'human' && (x.occupant.host || x.occupant.user.isBroadcaster || !!this.bridge.isStreamer?.(x.occupant.user))) + 1) || null,
+      turn: null,
+      mine: null,
+    };
+    if (this.phase !== 'playing' || !this.game) return state;
+    const d = this.decision;
+    if (d) {
+      const seat = this.seats[this.activeSeatIdx[d.seat]];
+      state.turn = { seat: this.activeSeatIdx[d.seat] + 1, label: this.#seatLabel(seat), prompt: d.prompt ?? null, endsAt: this.decisionEndsAt ?? null };
+    }
+    const g = this.activeSeatIdx.findIndex((i) => {
+      const o = this.seats[i].occupant;
+      return o?.type === 'human' && (o.host || o.user.isBroadcaster || !!this.bridge.isStreamer?.(o.user));
+    });
+    if (g === -1) return state;
+    const view = this.hidden ? this.game.viewFor(g) : null;
+    state.mine = {
+      seat: this.activeSeatIdx[g] + 1,
+      name: this.seats[this.activeSeatIdx[g]].name,
+      private: view ? (this.module.privateSummary?.(view) ?? null) : null,
+      // The streamer's move buttons (same numbers as in chat).
+      options: d?.seat === g && !this.#busy
+        ? d.options.map((o, i) => ({ n: i + 1, label: o.label ?? String(i + 1), disabled: !!o.disabled })).filter((o, i) => !d.options[i].hidden)
+        : null,
+    };
+    return state;
   }
 
   // ───────────────────────────── follower (joined phone) ─────────────────────────────

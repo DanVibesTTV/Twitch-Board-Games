@@ -25,6 +25,7 @@ A small program that serves the overlay, logs in to Twitch itself and keeps ever
 - **Twitch login built in:** read and write chat, plus Twitch predictions (Affiliate/Partner), with no extra app. Optionally connect your **bot account** so game messages come from the bot instead of you.
 - **Stats in a file** on your PC instead of the browser source's cache, with daily backups.
 - **Updates from this repo:** the app checks GitHub for new versions and installs them with one click. Your stats and login are kept.
+- **Streamer dock** for OBS (see below): your own cards in Texas Hold 'em, your move buttons, and seat controls.
 
 **Windows (no install needed):**
 1. Download **`StreamBoardGames-vX.Y.Z-windows-x64.zip`** from the latest [release](https://github.com/DanVibesTTV/Twitch-Board-Games/releases/latest) and extract it somewhere permanent, e.g. `Documents\StreamBoardGames`.
@@ -33,6 +34,12 @@ A small program that serves the overlay, logs in to Twitch itself and keeps ever
 4. In OBS, add a Browser Source with **`http://127.0.0.1:8765/?bridge=node`**. The panel's OBS section has checkboxes and fields for the game options and builds the URL for you (copy button included).
 
 Keep the exe in its folder: it loads the game files next to it, and updates replace those files.
+
+**Streamer dock (OBS):** in OBS choose **Docks → Custom Browser Docks…**, name it e.g. "Board Games" and use the URL **`http://127.0.0.1:8765/dock/`**. Only you see it:
+- In secret-card games (**Texas Hold 'em**) it shows **your own cards** and move buttons; the stream only shows them face down. While a dock is open, Hold 'em can be played on stream: you against bots (viewers need a private screen of their own, which comes later with the phone app).
+- Seat list with **kick** (lobby: frees the seat; during a game: a bot takes over), **Bot** / **Chat** per seat, bots count, mode, start and stop.
+- **Seat a player by Twitch username** in a chosen seat, e.g. whoever is next in your Lumia Stream or Streamer.bot queue. They show up as "not in chat yet" until they write anything in chat.
+- Every button is an ordinary mod command, so chatbot queues can do the same: `!bg seat 3 username`, `!bg kick 3` (or `!bg kick username`).
 
 **macOS/Linux (or Windows with Node.js):**
 1. Install **Node.js 22 or newer** ([how](#installing-nodejs)).
@@ -112,7 +119,7 @@ Options: `game=ludo`, `game=tubes`, `game=four`, `game=trivia`, `game=jazzy` or 
 | crowd | `!1` … | vote for a chat-controlled seat |
 | everyone | `!bgstats`, `!bgstats me`, `!bgstats <game>` | next leaderboard page on the game select screen; your own stats in chat; jump to a game's board |
 | everyone (draw modes) | `!join` | enter the draw; players are picked at random when the lobby closes |
-| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]` / `!bg play trivia [standard\|quick\|classic]` / `!bg play jazzy [classic\|quick\|chat]` / `!bg play pokerdice [match\|quick\|chat]`, `!bg mode <mode>`, `!bg cat …` (trivia categories), `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots) |
+| mods | `!bg play ludo` / `!bg play tubes` / `!bg play four [streamer\|duel\|chat]` / `!bg play trivia [standard\|quick\|classic]` / `!bg play jazzy [classic\|quick\|chat]` / `!bg play pokerdice [match\|quick\|chat]`, `!bg mode <mode>`, `!bg cat …` (trivia categories), `!bg vote`, `!bg start`, `!bg stop`, `!bg menu`, `!bg seat <seat> <username>`, `!bg kick <seat\|username>`, `!bg crowd <seat>`, `!bg bot <seat>`, `!bg bots <n>`, `!bg stats reset [game] confirm` | run the show (`!bg bots 6` = bots fill up to 6 seats, `0` = no bots; seats by number or name; `!bg seat` works in the lobby and, during a game, for seats a bot plays) |
 
 While a lobby is open, the board area shows a **How to play** panel with the game's steps, the join call-to-action and a big countdown that turns red in the last 10 seconds. Chat gets reminders at **30 s and 10 s left**, with the seat or entry count. Short countdowns skip the reminders that wouldn't fit.
 

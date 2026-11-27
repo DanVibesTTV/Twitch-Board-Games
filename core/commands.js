@@ -9,7 +9,7 @@
 //   !join [seat]        → { kind: 'join', arg }
 //   !leave              → { kind: 'leave' }
 //   !bgstats [me|page]  → { kind: 'stats', arg }         (everyone)
-//   !bg <sub> [arg]     → { kind: 'admin', sub, arg }   (mods/broadcaster only)
+//   !bg <sub> [arg]     → { kind: 'admin', sub, arg, rawArg }   (mods/broadcaster only)
 
 const ALIASES = { r: 'roll' };
 
@@ -28,7 +28,8 @@ export function parseCommand(msg, prefix = '!') {
   if (word === 'bg') {
     if (!(msg.user?.isMod || msg.user?.isBroadcaster)) return null;
     const [sub, ...subArgs] = (arg ?? '').split(/\s+/);
-    return { kind: 'admin', sub: (sub || 'help').toLowerCase(), arg: subArgs.join(' ').toLowerCase() || null };
+    // rawArg keeps the original spelling (e.g. a display name for "!bg seat 2 DanVibes").
+    return { kind: 'admin', sub: (sub || 'help').toLowerCase(), arg: subArgs.join(' ').toLowerCase() || null, rawArg: subArgs.join(' ') || null };
   }
   return { kind: 'alias', alias: ALIASES[word] ?? word, arg };
 }

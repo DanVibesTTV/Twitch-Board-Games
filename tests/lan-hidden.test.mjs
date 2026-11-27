@@ -45,7 +45,7 @@ function network(onClientMessage) {
 test('Hold\'em needs a private screen: greyed out for chat-only connections, playable on phones', () => {
   const reg = registry();
   assert.equal(reg.isPlayable(manifest, { chat: true, sendChat: true, whisper: true }), false);
-  assert.deepEqual(reg.missing(manifest, {}), ['private screens (phone app)']);
+  assert.deepEqual(reg.missing(manifest, {}), ['a private screen (phone app or streamer dock)']);
   assert.equal(reg.isPlayable(manifest, new LocalBridge().capabilities), true);
 });
 

@@ -421,3 +421,25 @@ export function holeName(cards, board) {
   const S = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
   return a === b ? `Pair of ${R[a]}` : `${S[a]}-${S[b]}${cards[0] % 13 !== cards[1] % 13 && Math.floor(cards[0] / 13) === Math.floor(cards[1] / 13) ? ' suited' : ''}`;
 }
+
+// What the streamer dock shows for the player of `view` (a viewFor(seat) result): their own cards,
+// the board and the numbers that matter. Plain data; the dock draws it (app/dock/).
+export function privateSummary(view) {
+  const me = view.players?.[view.you];
+  if (!me) return null;
+  const card = (c) => ({ text: cardText(c), red: Math.floor(c / 13) === 1 || Math.floor(c / 13) === 2 });
+  const toCall = Math.max(0, Math.min(view.currentBet - me.bet, me.chips));
+  const street = view.street === 'preflop' ? 'Pre-flop' : view.street[0].toUpperCase() + view.street.slice(1);
+  return {
+    title: me.out ? 'You are out' : me.folded ? 'You folded' : me.hand ?? 'Your cards',
+    cards: me.cards.filter((c) => c >= 0).map(card),
+    board: view.board.map(card),
+    facts: [
+      ['Chips', me.chips],
+      ['Pot', view.pot],
+      ['To call', toCall],
+      ['Blinds', `${view.sb}/${view.bb}`],
+      ['Hand', `#${view.hand} · ${street}`],
+    ],
+  };
+}

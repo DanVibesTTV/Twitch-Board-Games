@@ -1,5 +1,6 @@
 // The companion app itself (started by app/companion.mjs, which restarts it after updates).
-//   - serves the overlay at http://127.0.0.1:8765/ and the control panel at /panel/
+//   - serves the overlay at http://127.0.0.1:8765/, the control panel at /panel/ and the
+//     streamer dock (an OBS custom browser dock) at /dock/
 //   - connects to Twitch (chat in/out, predictions) for ?bridge=node
 //   - stores the overlay's data (viewer stats, trivia settings) in a file
 //   - checks GitHub for updates and installs them on request
@@ -39,6 +40,16 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   const send = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   const broadcast = (event, data) => { for (const res of clients) send(res, event, data); };
   twitch.on('chat', (msg) => broadcast('chat', msg));
+
+  // ---- Streamer dock ----
+  // The overlay (where the Session runs) POSTs its dock snapshot to /api/dock/state; it goes only
+  // to the dock's own stream (/api/dock/events), never to the overlay/panel stream, because for
+  // hidden-information games it holds the streamer's private cards. The dock's buttons POST chat
+  // commands to /api/dock/command, which reach the overlay as the streamer's own chat.
+  const docks = new Set();
+  let dockState = null;
+  const dockInfo = () => ({ connected: docks.size });
+  const toDocks = (event, data) => { for (const res of docks) send(res, event, data); };
   twitch.on('botState', (st) => {
     broadcast('twitchBot', st);
     console.log(`[twitch] bot account: ${st.state === 'none' ? 'not connected' : st.state}${st.login ? ` (${st.login})` : ''}${st.detail ? `: ${st.detail}` : ''}`);
@@ -72,9 +83,21 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       send(res, 'hello', { version: pkg.version });
       send(res, 'twitch', twitch.state);
       send(res, 'twitchBot', twitch.botState);
+      send(res, 'dock', dockInfo());
       clients.add(res);
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
+      return;
+    }
+    if (req.method === 'GET' && path === '/api/dock/events') {
+      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
+      res.write('retry: 2000\n\n');
+      send(res, 'hello', { version: pkg.version, overlays: clients.size });
+      if (dockState) send(res, 'state', dockState);
+      docks.add(res);
+      broadcast('dock', dockInfo()); // the overlay now sends its snapshot and offers hidden games
+      const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+      req.on('close', () => { clearInterval(ping); docks.delete(res); broadcast('dock', dockInfo()); });
       return;
     }
     // Everything else needs our header. Websites can't add it without CORS permission,
@@ -97,6 +120,21 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       if (!key.startsWith('boardgames.')) return json(res, 400, { error: 'bad key' });
       if (req.method === 'PUT') { store.set(key, body.value); return json(res, 200, { ok: true }); }
       if (req.method === 'DELETE') { store.delete(key); return json(res, 200, { ok: true }); }
+    }
+    // streamer dock
+    if (req.method === 'POST' && path === '/api/dock/state') {
+      dockState = body && typeof body === 'object' ? body : null;
+      toDocks('state', dockState);
+      return json(res, 200, { ok: true, docks: docks.size });
+    }
+    if (req.method === 'POST' && path === '/api/dock/command') {
+      const text = typeof body.text === 'string' ? body.text.trim() : '';
+      if (!text || text.length > 200 || /[\r\n]/.test(text)) return json(res, 400, { error: 'bad command' });
+      if (!clients.size) return json(res, 409, { error: 'the overlay is not open — add it to OBS (or open it in a browser) first' });
+      const login = twitch.state.login ?? 'streamer';
+      const user = { id: twitch.main?.userId ?? 'streamer', login, name: login, isBroadcaster: true, isMod: true };
+      broadcast('dockCommand', { platform: 'dock', text, user });
+      return json(res, 200, { ok: true });
     }
     // Twitch
     if (req.method === 'POST' && path === '/api/chat') return json(res, 200, await twitch.sendChat(body.text));
@@ -135,7 +173,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   async function serveFile(res, pathname) {
     let file = normalize(join(root, decodeURIComponent(pathname)));
     if (file !== root && !file.startsWith(root + sep)) { res.writeHead(403).end(); return; }
-    if (pathname === '/panel' || pathname.startsWith('/panel/')) file = normalize(join(root, 'app', decodeURIComponent(pathname)));
+    if (/^\/(panel|dock)(\/|$)/.test(pathname)) file = normalize(join(root, 'app', decodeURIComponent(pathname)));
     try {
       if ((await stat(file)).isDirectory()) file = join(file, 'index.html');
       const data = await readFile(file);
@@ -176,6 +214,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   console.log(`  Stream Board Games companion v${pkg.version}`);
   console.log(`  Control panel:  ${base}/panel/`);
   console.log(`  OBS overlay:    ${base}/?bridge=node`);
+  console.log(`  Streamer dock:  ${base}/dock/   (OBS: Docks → Custom Browser Docks)`);
   console.log(`  Data folder:    ${store.dir}`);
   console.log('  Keep this window open while you stream. Ctrl+C stops it.');
   console.log('');
