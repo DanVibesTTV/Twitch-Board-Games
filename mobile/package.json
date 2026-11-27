@@ -2,9 +2,9 @@
   "name": "stream-board-games-mobile",
   "private": true,
   "type": "module",
-  "description": "Android app shell (Capacitor) around the board games overlay: single-player against bots with touch input, over-the-air game updates.",
+  "description": "Android app shell (Capacitor) around the board games overlay: play against bots or with phones on the same WiFi, touch input, over-the-air game updates.",
   "//": "shell: raise it whenever the native side changes (a Capacitor plugin, permissions, prepare-android.mjs): over-the-air updates built for a newer shell are not applied to older APKs. updateUrl: where GitHub Pages publishes the app's files (forks: point at your own Pages).",
-  "shell": 1,
+  "shell": 2,
   "updateUrl": "https://danvibesttv.github.io/Twitch-Board-Games/app/",
   "scripts": {
     "build": "node build-www.mjs",

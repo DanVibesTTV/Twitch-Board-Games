@@ -37,7 +37,7 @@ jobs:
       - name: Collect site files
         run: |
           mkdir _site
-          cp -r index.html main.js core bridges renderer ui games sounds _site/
+          cp -r index.html main.js core bridges net renderer ui games sounds _site/
       # The Android app's over-the-air updates: the same files the APK ships (Three.js bundled,
       # local bridge default) plus version.json and files.json with SHA-256 checksums.
       # Phones only switch to them when package.json's version is newer than theirs.

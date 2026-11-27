@@ -11,7 +11,9 @@ export class LocalBridge extends Bridge {
   constructor(options = {}) {
     super(options);
     const name = String(options.playerName ?? '').trim().slice(0, 25) || 'You';
-    this.user = { id: 'local-player', login: 'you', name, isBroadcaster: true, isMod: true };
+    // playerId: a random id per phone (main.js keeps it), so players stay apart in same-WiFi games.
+    const id = String(options.playerId ?? '').trim() || 'local-player';
+    this.user = { id, login: 'you', name, isBroadcaster: true, isMod: true };
   }
 
   async connect() { this.status('connected', 'on this device'); }

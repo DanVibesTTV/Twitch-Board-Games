@@ -17,6 +17,28 @@ over an older one. (Builds made before that key existed were signed with a rando
 uninstall that version once.) Before APKs are shared with other people we create a real signing
 key once and keep it as a GitHub secret (losing it means users must uninstall).
 
+## Same-WiFi multiplayer
+
+1. One phone taps **📶 Host a WiFi game** on the game select screen (asks for a name once).
+2. The others tap **🔗 Join a WiFi game**: games on the WiFi are listed; if not, type the address
+   the host shows (e.g. `192.168.1.23`).
+3. The host picks a game: everyone connected is seated, empty seats become bots, **Play**.
+   Each phone taps its own moves; the others see "Waiting for Alex…". ✕ leaves.
+
+How it works: the host's phone runs the real game (rules, timers, bots). Every other phone runs an
+identical copy, kept in step by tiny messages — which option was chosen plus the dice RNG's
+state ("seat N chose option K"). Trivia questions are recorded on the host and sent along.
+Phones must run the same app version. Someone who leaves mid-game is replaced by a bot.
+
+- Native side: `mobile/native/LanPlugin.java` (TCP on port 47823 + Android network service
+  discovery `_sbgames._tcp`), registered by `prepare-android.mjs`. JS: `net/transport.js`,
+  `net/lan.js`, `ui/lan-ui.js`; Session follower mode in `core/session.js`.
+- Test in a browser without phones: two tabs of
+  `http://127.0.0.1:8765/?bridge=local&lanvia=bc&player=a` and `…&player=b`
+  (BroadcastChannel between tabs).
+- Android 17 will require a local-network permission for apps targeting it; the app targets
+  Android 16 for now.
+
 ## Over-the-air updates
 
 New games and fixes reach the app without a new APK:
@@ -71,4 +93,5 @@ npm run apk              # → android/app/build/outputs/apk/debug/app-debug.apk
   and its built-in questions otherwise.
 - Tap pieces on the board (pawns, columns, dice, trivia spaces); a Roll button pops up when you
   can roll.
-- Not yet: same-WiFi multiplayer, a high-resolution app icon.
+- Same-WiFi multiplayer (see above).
+- Not yet: QR code to join, a high-resolution app icon.
