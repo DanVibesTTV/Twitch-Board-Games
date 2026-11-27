@@ -3,6 +3,7 @@ import { LumiaBridge } from './lumia.js';
 import { StreamerBotBridge } from './streamerbot.js';
 import { DevBridge } from './dev.js';
 import { NodeBridge } from './node.js';
+import { LocalBridge } from './local.js';
 
 export const BRIDGES = {
   irc: AnonIrcBridge,
@@ -10,6 +11,7 @@ export const BRIDGES = {
   streamerbot: StreamerBotBridge,
   dev: DevBridge,
   node: NodeBridge,
+  local: LocalBridge,
 };
 
 export function createBridge(kind, options) {

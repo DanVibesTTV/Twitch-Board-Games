@@ -9,7 +9,8 @@ export function createView(stage) {
       await r.intro(g);
     },
     async present(events, g) { await r?.present(events, g); },
-    decision(d) { r?.showDecision(d, game); },
-    unmount() { r?.dispose(); r = null; game = null; },
+    // Tap targets belong to one decision: cleared before the renderer shows the next one.
+    decision(d) { stage.setTapTargets?.([]); r?.showDecision(d, game); },
+    unmount() { stage.setTapTargets?.([]); r?.dispose(); r = null; game = null; },
   };
 }

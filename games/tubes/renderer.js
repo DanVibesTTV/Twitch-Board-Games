@@ -162,11 +162,12 @@ export function createRenderer(stage, { seats }) {
 
   return {
     async intro(game) {
-      stage.frame(ROWS, { tilt: 34, fill: 0.92, center: [2.4, 0, 0.35] });
+      stage.frame(ROWS, { tilt: 34, fill: 0.92, center: [2.4, 0, 0.35], besides: 2.0 }); // besides: the die
       board = await unfoldBoard(stage, { boardTex, backTex, size: COLS, depth: ROWS, thickness: THICK, edgeColor: 0x2a1458 });
 
       die = new Die(stage, { size: 0.95, faceColor: '#140a30', pipColor: '#00e5ff', onePipColor: '#ff2bd6', glow: true });
-      die.place(COLS / 2 + 1.2, 0, ROWS / 2 - 1.4);
+      // Phone layout: the die sits beside the middle of the board, clear of the Roll button in the corner.
+      die.place(COLS / 2 + 1.2, 0, stage.panelOffsets ? ROWS / 2 - 1.4 : 0);
 
       const targets = layout(game.state);
       await Promise.all(game.state.pos.map((_, seat) => {

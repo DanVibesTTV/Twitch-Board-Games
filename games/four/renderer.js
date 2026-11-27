@@ -78,6 +78,7 @@ function labelTexture(states, color) {
 export function createRenderer(stage, { seats }) {
   const colors = seats.map((s) => s.color);
   const discs = new Map(); // "c,r" → mesh
+  const columnHits = [];   // invisible tap areas, one per column
   const group = new THREE.Group(); // pivot at the bottom-front edge for the flip-up
   const discGeo = new THREE.CylinderGeometry(DISC_R, DISC_R, DISC_T, 36);
   discGeo.rotateX(Math.PI / 2);
@@ -137,6 +138,15 @@ export function createRenderer(stage, { seats }) {
     );
     label.position.set(0, TOP + 0.5, PLATE_Z);
     group.add(label);
+    // Invisible hit areas, one per column (label row included), for tapping a column on a phone.
+    const hitMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false, colorWrite: false });
+    const hitGeo = new THREE.BoxGeometry(CELL, TOP + 1 - BASE, DEPTH + 0.4);
+    for (let c = 0; c < COLS; c++) {
+      const hit = new THREE.Mesh(hitGeo, hitMat);
+      hit.position.set(holeX(c), (BASE + TOP + 1) / 2, 0);
+      group.add(hit);
+      columnHits.push(hit);
+    }
     const shadow = blobShadow(1);
     shadow.scale.set(W * 0.75, 1.5, 1);
     shadow.position.y = 0.005;
@@ -214,6 +224,7 @@ export function createRenderer(stage, { seats }) {
     // Light up the playable column numbers in the current player's color.
     showDecision(d) {
       setLabels(d.options.map((o) => (o.disabled ? 'off' : 'on')), colors[d.seat]);
+      stage.setTapTargets?.(d.options.map((o, c) => (o.disabled ? null : { option: c, objects: [columnHits[c]] })).filter(Boolean));
     },
 
     dispose() {

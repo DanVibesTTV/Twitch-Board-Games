@@ -12,8 +12,14 @@ export const ease = {
 
 const DEFAULT_FOV = 34;
 
+// True while a text field has focus (the on-screen keyboard is probably open).
+function isTyping() {
+  const a = typeof document !== 'undefined' ? document.activeElement : null;
+  return !!a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+}
+
 export class Stage {
-  constructor(container, { fpsCap = 60, maxPixelRatio = 1.5, antialias = true } = {}) {
+  constructor(container, { fpsCap = 60, maxPixelRatio = 1.5, antialias = true, panelOffsets = true } = {}) {
     this.container = container;
     this.renderer = new THREE.WebGLRenderer({ antialias, alpha: true, powerPreference: 'low-power' });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxPixelRatio));
@@ -30,6 +36,7 @@ export class Stage {
     sun.position.set(-6, 14, 8);
     this.scene.add(sun);
 
+    this.panelOffsets = panelOffsets;
     this.minFrameMs = 1000 / fpsCap;
     this.anims = new Set();
     this.dirty = true;
@@ -38,19 +45,32 @@ export class Stage {
 
     this.resize = this.resize.bind(this);
     window.addEventListener('resize', this.resize);
+    // On phones the on-screen keyboard shrinks the window. While someone is typing, the board
+    // keeps its size (no jumping camera); the skipped resize is done once the input loses focus.
+    this.onFocusOut = () => setTimeout(() => { if (this.resizePending && !isTyping()) this.resize(); }, 250);
+    window.addEventListener('focusout', this.onFocusOut);
     this.resize();
   }
 
   // Positions the camera so a square board of `size` fits, viewed at `tilt` degrees from vertical.
-  frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0] } = {}) {
+  // besides: world units of things to the right of the board (e.g. the die) that must stay in view
+  // in the touch layout. On the desktop the game's center offset already leaves room for them.
+  frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0], besides = 0 } = {}) {
     this.viewArgs = null;
+    const args = [size, { tilt, fill, center, besides }];
+    // Games shift the board sideways (center x) to leave room for the HUD's side panel. When the
+    // stage itself already stops at the panel (touch layout), that shift is replaced by just
+    // enough room for `besides`.
+    if (!this.panelOffsets) center = [besides / 2, center[1], center[2]];
     this.camera.fov = DEFAULT_FOV;
     this.#applyShift(0);
     const vfov = THREE.MathUtils.degToRad(this.camera.fov);
     const aspect = this.camera.aspect;
     // Fit the board's diagonal-ish footprint in whichever dimension is tighter.
     const needH = size * (0.82 + 0.18 * Math.cos(THREE.MathUtils.degToRad(tilt))) / fill;
-    const needW = size / fill;
+    // Some games overfill (fill > 1) on purpose for a 16:9 screen. On a narrower touch stage
+    // that would cut the board off at the sides, so the width always fits there.
+    const needW = this.panelOffsets ? size / fill : size / Math.min(fill, 0.9) + besides;
     const distH = needH / 2 / Math.tan(vfov / 2);
     const distW = needW / 2 / (Math.tan(vfov / 2) * aspect);
     const dist = Math.max(distH, distW);
@@ -58,7 +78,7 @@ export class Stage {
     this.target.set(...center);
     this.camera.position.set(center[0], center[1] + Math.cos(a) * dist, center[2] + Math.sin(a) * dist);
     this.camera.lookAt(this.target);
-    this.frameArgs = [size, { tilt, fill, center }];
+    this.frameArgs = args;
     this.invalidate();
   }
 
@@ -68,6 +88,7 @@ export class Stage {
   // nothing gets viewed at an angle. A narrow fov keeps perspective distortion low.
   view({ width, height, center = [0, 0, 0], fov = 24, elevation = 6, fill = 0.9, shiftX = 0 }) {
     this.frameArgs = null;
+    if (!this.panelOffsets) shiftX = 0; // see frame()
     this.viewArgs = { width, height, center, fov, elevation, fill, shiftX };
     this.camera.fov = fov;
     const t = Math.tan(THREE.MathUtils.degToRad(fov) / 2);
@@ -94,6 +115,9 @@ export class Stage {
   resize() {
     const w = this.container.clientWidth || window.innerWidth;
     const h = this.container.clientHeight || window.innerHeight;
+    // Only the height changed while typing → the keyboard opened or closed.
+    if (isTyping() && this.width === w && this.height) { this.resizePending = true; return; }
+    this.resizePending = false;
     this.renderer.setSize(w, h, false);
     this.renderer.domElement.style.width = '100%';
     this.renderer.domElement.style.height = '100%';
@@ -109,6 +133,62 @@ export class Stage {
   invalidate() {
     this.dirty = true;
     this.#kick();
+  }
+
+  // ── Touch play: tapping pieces on the board ──
+  // Renderers register what can be tapped for the current decision:
+  //   stage.setTapTargets([{ option: 0, objects: [pawnMesh, badge] }, …])
+  // A tap on (or near) one of those objects picks that option.
+  setTapTargets(targets) { this.tapTargets = targets ?? []; }
+
+  // Option index at a screen point (client px), or -1. Exact hits first; otherwise the target
+  // whose object is closest on screen, within `radius` px (fingers are bigger than pawns).
+  pickTap(clientX, clientY, radius = 44) {
+    const targets = this.tapTargets ?? [];
+    if (!targets.length) return -1;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return -1;
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster ??= new THREE.Raycaster();
+    this.raycaster.setFromCamera(ndc, this.camera);
+    let best = -1;
+    let bestDist = Infinity;
+    for (const t of targets) {
+      const objs = (t.objects ?? []).filter((o) => o?.parent);
+      if (!objs.length) continue;
+      const hit = this.raycaster.intersectObjects(objs, true)[0];
+      if (hit && hit.distance < bestDist) { bestDist = hit.distance; best = t.option; }
+    }
+    if (best !== -1) return best;
+    const p = new THREE.Vector3();
+    let bestPx = radius;
+    for (const t of targets) {
+      for (const o of t.objects ?? []) {
+        if (!o?.parent) continue;
+        o.getWorldPosition(p).project(this.camera);
+        if (p.z > 1) continue; // behind the camera
+        const px = Math.hypot(((p.x + 1) / 2) * rect.width + rect.left - clientX, ((1 - p.y) / 2) * rect.height + rect.top - clientY);
+        if (px < bestPx) { bestPx = px; best = t.option; }
+      }
+    }
+    return best;
+  }
+
+  // Calls onTap(optionIndex) for short taps on a tap target (drags and long presses are ignored).
+  enableTap(onTap) {
+    const el = this.renderer.domElement;
+    let down = null;
+    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    el.addEventListener('pointerup', (e) => {
+      if (!down) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const quick = performance.now() - down.t < 600;
+      down = null;
+      if (moved > 14 || !quick) return;
+      const option = this.pickTap(e.clientX, e.clientY);
+      if (option !== -1) onTap(option);
+    });
+    el.addEventListener('pointercancel', () => { down = null; });
   }
 
   // Runs fn(t) with t going 0→1 over `ms`, eased. Resolves when done.
@@ -163,6 +243,7 @@ export class Stage {
 
   dispose() {
     window.removeEventListener('resize', this.resize);
+    window.removeEventListener('focusout', this.onFocusOut);
     this.renderer.dispose();
     this.renderer.domElement.remove();
   }

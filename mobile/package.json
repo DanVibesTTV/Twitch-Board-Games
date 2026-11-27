@@ -1,0 +1,23 @@
+{
+  "name": "stream-board-games-mobile",
+  "private": true,
+  "type": "module",
+  "description": "Android app shell (Capacitor) around the board games overlay: single-player against bots with touch input.",
+  "scripts": {
+    "build": "node build-www.mjs",
+    "android:init": "npx cap add android && node prepare-android.mjs",
+    "android:sync": "node build-www.mjs && npx cap sync android",
+    "apk": "node build-www.mjs && npx cap sync android && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.4.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
