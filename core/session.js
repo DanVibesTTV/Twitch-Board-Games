@@ -9,6 +9,11 @@
 // identical copy of the game. Their Sessions are followers: no chat, no timers, no bots — they
 // only replay what the host sends (followMenu / followLobby / followStart / followApply /
 // followDecision).
+//
+// Hidden-information games (manifest "hidden": true, e.g. Texas Hold 'em): the renderer never
+// gets the full game, only `game.viewFor(perspective)` — the cards this screen may show. Over
+// WiFi there is no replay (the RNG state would reveal the deck): the host sends every phone its
+// own view plus the public events ('lanHiddenStart' / 'lanHiddenUpdate', followHidden*).
 
 import { Emitter } from './emitter.js';
 import { parseCommand } from './commands.js';
@@ -377,7 +382,9 @@ export class Session extends Emitter {
       rules,
       ctx: ctx ?? null,
     });
-    if (this.lanHost) {
+    if (this.lanHost && this.hidden) {
+      this.emit('lanHiddenStart', { gameId: this.manifest.id, modeId: this.mode?.id ?? null, rules, activeSeatIdx: this.activeSeatIdx, seats: this.seats });
+    } else if (this.lanHost) {
       this.emit('lanStart', {
         gameId: this.manifest.id,
         modeId: this.mode?.id ?? null,
@@ -395,7 +402,7 @@ export class Session extends Emitter {
     this.#openPrediction(humans);
     this.#busy = true;
     try {
-      await withTimeout(this.view?.mount?.(this.module, this.game, this.activeSeatIdx.map((i) => this.seats[i])), 20000, 'board intro');
+      await withTimeout(this.view?.mount?.(this.module, this.#shown(), this.activeSeatIdx.map((i) => this.seats[i])), 20000, 'board intro');
     } catch (err) { console.error('[session] view mount failed', err); }
     this.#busy = false;
     if (this.phase === 'playing') this.#nextDecision();
@@ -488,7 +495,7 @@ export class Session extends Emitter {
       endsAt: Date.now() + waitMs,
       total: waitMs / 1000,
     });
-    this.view?.decision?.(d, seat);
+    this.view?.decision?.(d, seat, this.#shown());
   }
 
   // What happens when time runs out: the game may decide (e.g. a trivia answer counts as wrong),
@@ -552,7 +559,8 @@ export class Session extends Emitter {
     this.#lanRecords = [];
     try {
       result = this.game.apply(index);
-      if (this.lanHost) this.emit('lanApply', { index, rngState, records: this.#lanRecords.splice(0) });
+      if (this.lanHost && this.hidden) this.emit('lanHiddenUpdate', { events: result.events ?? [], log: result.log ?? [], seat: d.seat });
+      else if (this.lanHost) this.emit('lanApply', { index, rngState, records: this.#lanRecords.splice(0) });
     } catch (err) {
       // Rejected move: restore the turn so the game never stalls.
       console.error('[session] game.apply failed', err);
@@ -565,7 +573,7 @@ export class Session extends Emitter {
     for (const line of result.log ?? []) this.emit('log', { seat, text: line });
     try {
       this.emit('gameEvents', result.events ?? []);
-      await withTimeout(this.view?.present?.(result.events ?? [], this.game), 15000, 'move animation');
+      await withTimeout(this.view?.present?.(result.events ?? [], this.#shown()), 15000, 'move animation');
     } catch (err) { console.error('[session] view present failed', err); }
     this.#busy = false;
     this.#nextDecision();
@@ -593,6 +601,27 @@ export class Session extends Emitter {
       if (this.config.afterGame === 'menu') this.toMenu();
       else this.openLobby(this.manifest.id, this.mode?.id);
     });
+  }
+
+  // ───────────────────────────── hidden information ─────────────────────────────
+
+  get hidden() { return this.manifest?.hidden === true; }
+
+  // Game seat played on this screen (the local player), or null = public view.
+  get perspective() {
+    const me = this.bridge.user?.id;
+    if (!me || !this.activeSeatIdx) return null;
+    const g = this.activeSeatIdx.findIndex((i) => this.seats[i]?.occupant?.user?.id === me);
+    return g >= 0 ? g : null;
+  }
+
+  // What the renderer gets: the game itself, or for hidden games only this screen's view.
+  #shown() {
+    if (!this.hidden || !this.game) return this.game;
+    if (this.follower) return this.game; // already a view (followHiddenStart)
+    const game = this.game;
+    const perspective = this.perspective;
+    return { hidden: true, state: game.viewFor(perspective), viewFor: () => game.viewFor(perspective), decision: () => game.decision() };
   }
 
   // ───────────────────────────── follower (joined phone) ─────────────────────────────
@@ -646,14 +675,62 @@ export class Session extends Emitter {
   }
 
   // The host started waiting for a decision (ms: time left on the host's clock).
-  followDecision({ ms, total }) {
+  followDecision({ ms, total, decision = null }) {
     if (this.phase !== 'playing' || !this.game) return;
-    const d = this.game.decision();
+    const d = this.hidden ? decision : this.game.decision(); // hidden games: the host sends it
     if (!d) return;
     this.decision = d;
+    if (this.hidden) this.game.current = d;
     const seat = this.seats[this.activeSeatIdx[d.seat]];
     this.emit('decision', { decision: d, seat, occupant: seat.occupant, endsAt: Date.now() + Math.max(0, ms), total });
-    this.view?.decision?.(d, seat);
+    this.view?.decision?.(d, seat, this.#shown());
+  }
+
+  // Hidden game on a joined phone: there is no game logic here, only the view the host sends.
+  async followHiddenStart({ gameId, modeId, rules, activeSeatIdx, seats, view }) {
+    this.#teardownGame();
+    await this.#followGame(gameId, modeId);
+    this.seats = seats;
+    this.activeSeatIdx = activeSeatIdx;
+    this.rules = rules;
+    const stub = { hidden: true, state: view, current: null };
+    stub.viewFor = () => stub.state;
+    stub.decision = () => stub.current;
+    this.game = stub;
+    this.phase = 'playing';
+    this.emit('phase', this.phase);
+    this.#emitSeats();
+    this.#busy = true;
+    try {
+      await withTimeout(this.view?.mount?.(this.module, this.game, activeSeatIdx.map((i) => seats[i])), 20000, 'board intro');
+    } catch (err) { console.error('[session] view mount failed', err); }
+    this.#busy = false;
+  }
+
+  async followHiddenUpdate({ view, events = [], log = [], seat: g }) {
+    if (this.phase !== 'playing' || !this.game?.hidden) return;
+    this.game.state = view;
+    this.game.current = null;
+    this.decision = null;
+    this.emit('decision', null);
+    const seat = this.seats[this.activeSeatIdx[g]];
+    for (const line of log) this.emit('log', { seat, text: line });
+    this.#busy = true;
+    try {
+      this.emit('gameEvents', events);
+      await withTimeout(this.view?.present?.(events, this.game), 15000, 'move animation');
+    } catch (err) { console.error('[session] view present failed', err); }
+    this.#busy = false;
+  }
+
+  // The host's game ended (ranking: seat ids, winner first).
+  followHiddenOver({ ranking = [], draw = false }) {
+    if (this.phase !== 'playing') return;
+    const seatsById = new Map(this.seats.map((s) => [s.id, s]));
+    const order = ranking.map((id) => seatsById.get(id)).filter(Boolean);
+    this.phase = 'over';
+    this.emit('phase', this.phase);
+    this.emit('gameOver', { winner: draw ? null : order[0] ?? null, draw, ranking: order });
   }
 
   // The host applied option `index`. Throws if this copy of the game has drifted apart.
@@ -671,7 +748,7 @@ export class Session extends Emitter {
     this.#busy = true;
     try {
       this.emit('gameEvents', result.events ?? []);
-      await withTimeout(this.view?.present?.(result.events ?? [], this.game), 15000, 'move animation');
+      await withTimeout(this.view?.present?.(result.events ?? [], this.#shown()), 15000, 'move animation');
     } catch (err) { console.error('[session] view present failed', err); }
     this.#busy = false;
     if (!this.game.decision()) this.#finish();

@@ -70,6 +70,26 @@ Options can also be `hidden: true`: they aren't shown and `!<number>` can't pick
 
 The HUD also receives each move's events (`session.on('gameEvents')`), so games can drive HUD effects like the answer reveal.
 
+| More extras | What it does |
+|---|---|
+| `decision.hint` | the hint the touch HUD shows on the player's turn (default: "Tap a numbered piece on the board, or a move below") |
+| `lan` (export) | same-WiFi play, for setup data other phones can't rebuild: `{ hostCtx(ctx, record), spec(ctx), clientCtx(spec, next) }`. Trivia Champ records each question drawn on the host and replays it on the other phones (`games/trivia/lan.js`) |
+
+## Hidden information (secret cards)
+
+Set `"hidden": true` in the manifest and add `"privateView"` to `needs` (a screen only one player sees: the phone app today). Then also return `viewFor(seat)` from `createGame`:
+
+```js
+viewFor(seat)   // what that game seat may see; seat = null → the public view (stream, spectators)
+```
+
+- The renderer never gets the real game: `game.state` is `viewFor(<this screen's player>)`. Write the renderer against the view only.
+- Over WiFi there is no replay (the RNG state would reveal the deck): the host sends each phone its own view and the public events.
+- **Events and log lines are public.** Never put a hidden card in them. Cards that become public (a showdown) may appear in an event.
+- `game.state` may hold everything (the deck, every hand); it stays on the host.
+
+Texas Hold 'em (`games/holdem/`) is the reference: `viewFor` replaces other players' cards with `-1` until a showdown. `tests/holdem.test.mjs` and `tests/lan-hidden.test.mjs` check that no view and no WiFi message ever leaks a hidden card.
+
 ## Renderer: `createRenderer(stage, { seats })`
 
 `stage` is the shared `Stage` (`stage.scene`, `stage.animate(ms, t => …)`, `stage.wait(ms)`, `stage.frame(size, opts)`, `stage.invalidate()`). Return:
