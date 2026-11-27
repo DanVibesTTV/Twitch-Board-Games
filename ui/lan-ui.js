@@ -60,9 +60,11 @@ export class LanUi {
         <button class="lan-btn ghost" data-lan="stop">Stop hosting</button>
       </div>`;
     }
+    const name = savedPlayerName();
     return `<div class="lan-box" data-lan-box>
       <button class="lan-btn" data-lan="host">📶 Host a WiFi game</button>
       <button class="lan-btn" data-lan="join">🔗 Join a WiFi game</button>
+      ${name ? `<button class="lan-btn ghost lan-name" data-lan="rename" aria-label="Change your name">✏️ ${esc(name)}</button>` : ''}
     </div>`;
   }
 
@@ -71,6 +73,7 @@ export class LanUi {
       if (act === 'host') { await this.#ensureName(); await this.#startHost(); }
       if (act === 'stop') { await this.host?.stop(); this.host = null; this.#status(); this.hud?.refresh(); }
       if (act === 'join') { await this.#ensureName(); this.#openJoin(); }
+      if (act === 'rename') { if (await this.#askName(savedPlayerName())) this.hud?.refresh(); }
       if (act === 'pick') this.#goJoin(el.dataset.address);
       if (act === 'manual') {
         const v = this.modal.querySelector('input[name="address"]')?.value.trim();
@@ -85,27 +88,32 @@ export class LanUi {
   }
 
   // ── name ──
+  // Asked once before the first WiFi game; the ✏️ button on the game select screen changes it.
   #ensureName() {
     const saved = savedPlayerName();
     if (saved) { this.bridge.user.name = saved; return Promise.resolve(saved); }
+    return this.#askName('').then((name) => name ?? new Promise(() => {})); // cancelled: stop here
+  }
+
+  // Resolves with the new name, or null when cancelled.
+  #askName(current) {
     return new Promise((resolve) => {
       this.#showModal(`
-        <h2>Your name</h2>
-        <p>Shown to the other players.</p>
-        <input name="player" maxlength="20" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="e.g. Dan">
-        <div class="lan-row"><button class="lan-btn ghost" data-lan="cancel">Cancel</button><button class="lan-btn" data-lan="name-ok" data-enter>OK</button></div>`);
+        <h2>${current ? 'Change your name' : 'Your name'}</h2>
+        <p>Shown to the other players in WiFi games.</p>
+        <input name="player" maxlength="20" autocomplete="off" autocapitalize="words" enterkeyhint="done" placeholder="e.g. Dan" value="${esc(current ?? '')}">
+        <div class="lan-row"><button class="lan-btn ghost" data-lan="name-cancel">Cancel</button><button class="lan-btn" data-lan="name-ok" data-enter>${current ? 'Save' : 'OK'}</button></div>`);
       const input = this.modal.querySelector('input');
-      setTimeout(() => input.focus(), 50);
-      const ok = this.modal.querySelector('[data-lan="name-ok"]');
-      ok.addEventListener('click', () => {
+      setTimeout(() => { input.focus(); input.select(); }, 50);
+      const finish = (name) => { input.blur(); this.#closeModal(); resolve(name); };
+      this.modal.querySelector('[data-lan="name-cancel"]').addEventListener('click', () => finish(null), { once: true });
+      this.modal.querySelector('[data-lan="name-ok"]').addEventListener('click', () => {
         const name = input.value.trim().slice(0, 20);
         if (!name) { input.focus(); return; }
         store.set(NAME_KEY, name);
         this.bridge.user.name = name;
-        input.blur();
-        this.#closeModal();
-        resolve(name);
-      }, { once: true });
+        finish(name);
+      });
     });
   }
 
