@@ -283,4 +283,28 @@ events.addEventListener('twitchBot', (ev) => {
 });
 events.addEventListener('update', (ev) => renderUpdate(JSON.parse(ev.data)));
 
+// Phone players (stream sessions): app/phone-sessions.mjs on the server side.
+let phoneSession = null;
+let phoneStatus = { connected: false, players: [] };
+function renderPhones() {
+  const st = phoneSession;
+  if (!st) return;
+  $('phones-enabled').checked = !!st.enabled;
+  if (document.activeElement !== $('phones-server')) $('phones-server').value = st.server ?? '';
+  const live = st.state === 'open' && phoneStatus.connected;
+  const label = !st.enabled ? 'off'
+    : st.state === 'open' ? (live ? `on · ${phoneStatus.players.length} phone${phoneStatus.players.length === 1 ? '' : 's'}` : 'open · overlay not connected')
+    : st.state === 'waiting-login' ? 'log in first' : st.state === 'opening' ? 'connecting…' : st.state === 'error' ? 'problem' : st.state;
+  $('phones-state').textContent = label;
+  $('phones-detail').textContent = !st.enabled ? ''
+    : st.state === 'open'
+      ? (live ? `Viewers join with your name "${st.session}".${phoneStatus.players.length ? ` Connected: ${phoneStatus.players.join(', ')}` : ''}`
+        : 'Open the overlay in OBS (or a browser) — it hosts the game for the phones.')
+      : st.detail ?? '';
+}
+events.addEventListener('streamSession', (ev) => { phoneSession = JSON.parse(ev.data); renderPhones(); });
+events.addEventListener('streamStatus', (ev) => { phoneStatus = JSON.parse(ev.data); renderPhones(); });
+$('phones-enabled').addEventListener('change', () => api('/api/phones', { enabled: $('phones-enabled').checked }).catch((err) => toast(err.message)));
+$('phones-save').addEventListener('click', () => api('/api/phones', { server: $('phones-server').value }).then(() => toast('Saved')).catch((err) => toast(err.message)));
+
 loadGames().then(refresh).catch((err) => { document.querySelector('main').insertAdjacentHTML('afterbegin', `<p class="note">${esc(err.message)}</p>`); });

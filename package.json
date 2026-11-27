@@ -1,6 +1,6 @@
 {
   "name": "twitch-boardgames",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "description": "Chat-playable board games for Twitch streams (Three.js overlay + bridges for Lumia Stream, Streamer.bot, anonymous IRC and a local companion app).",
@@ -8,7 +8,8 @@
     "start": "node app/companion.mjs",
     "serve": "node tools/serve.mjs",
     "test": "node --test tests/*.test.mjs",
-    "build:exe": "node tools/build-exe.mjs"
+    "build:exe": "node tools/build-exe.mjs",
+    "session-server": "node app/session-server.mjs"
   },
   "engines": {
     "node": ">=22"

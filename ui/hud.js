@@ -113,7 +113,7 @@ export class Hud {
     const m = this.s.manifest;
     const st = this.status;
     this.header.innerHTML = `
-      ${this.touch && this.s.follower ? '<button class="hud-back" data-lan="leave" aria-label="Leave the WiFi game">✕</button>'
+      ${this.touch && this.s.follower ? '<button class="hud-back" data-lan="leave" aria-label="Leave the game">✕</button>'
         : this.touch && this.s.phase !== 'menu' ? '<button class="hud-back" data-cmd="!bg stop" aria-label="Back to game select">✕</button>' : ''}
       <div class="title">${esc(this.s.phase === 'menu' || !m ? 'Board Games' : m.name)}</div>
       <div class="conn conn-${esc(st.state)}" title="${esc(st.detail)}"><i></i>${esc(st.detail || st.state)}</div>`;
@@ -126,7 +126,7 @@ export class Hud {
     const follower = this.s.follower;
     const head = el('div', 'menu-head', vote
       ? `<h1>Vote for the next game</h1><p>Type <b>${this.p}1</b>, <b>${this.p}2</b> … in chat</p>${this.#timerBar(vote.endsAt, vote.total)}`
-      : follower ? `<h1>WiFi game</h1><p>${this.lan?.waitingText ?? ''}</p>`
+      : follower ? `<h1>${this.lan?.stream ? 'Stream' : 'WiFi game'}</h1><p>${this.lan?.waitingText ?? ''}</p>`
       : this.touch ? `<h1>Pick a game</h1><p>${this.s.lanHost ? 'Tap a game — everyone connected plays' : 'Tap a game to play against bots'}</p>${this.lan?.menuHtml() ?? ''}`
       : `<h1>Pick a game</h1><p>Streamer/mods: <b>${this.p}bg play &lt;game&gt;</b> or <b>${this.p}bg vote</b></p>`);
     // One row of cards; once they don't fit it becomes an endless right-to-left carousel.
@@ -232,6 +232,7 @@ export class Hud {
     this.main.innerHTML = `
       ${draw
         ? `<p>Type <b>${this.p}join</b> to enter. <span class="entrants"><b>${this.entrants.length}</b> entered${recent ? `: ${this.entrants.length > 6 ? '… ' : ''}${recent}` : ''}</span></p>`
+        : this.s.hidden && this.phoneJoin ? `<p>📱 Join on your phone: <b>Stream Board Games</b> app → Join a stream → <b>${esc(this.phoneJoin)}</b></p>`
         : `<p>Type <b>${this.p}join</b> or <b>${this.p}join ${esc(openSeat.id)}</b> to pick a color.</p>`}
       <p class="muted">${m.players.min === m.players.max ? `${m.players.min} players` : `${m.players.min}–${m.players.max} players`}${this.s.botFillTo ? ` · empty seats become bots` : ''}${m.modes?.length > 1 ? ` · mods: ${this.p}bg mode ${m.modes.map((x) => x.id).join('|')}` : ''}</p>
       ${t ? `<div class="label">Starting in</div>${this.#timerBar(t.endsAt, t.total, true)}` : '<div class="muted">Countdown starts with the first player.</div>'}
@@ -266,7 +267,7 @@ export class Hud {
         ${steps.length ? `<h3>How to play</h3><ol class="ls-steps">${steps.map((s) => `<li><span>${highlightCommands(esc(s))}</span></li>`).join('')}</ol>` : ''}
         ${playerCmds.length && !steps.length ? `<div class="ls-cmds">${playerCmds.map((c) => `<span><b>${esc(c.cmd)}</b> ${esc(c.help)}</span>`).join('')}</div>` : ''}
         ${this.touch ? this.#touchLobbyControls() : `<div class="ls-cta">
-          <div class="ls-join">Type <b>${this.p}join</b> ${draw ? 'to enter the draw' : 'to play'}<div class="ls-count-label">${count}</div></div>
+          <div class="ls-join">${this.#joinCall(draw)}<div class="ls-count-label">${count}</div></div>
           <div class="ls-countdown">${t ? `<div class="ls-secs" data-ends="${t.endsAt}">${Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000))}</div><div class="ls-sub">seconds</div>` : '<div class="ls-wait">Waiting for the first player…</div>'}</div>
         </div>`}
         ${modCmds.length && !this.touch ? `<div class="ls-mods">Mods: ${modCmds.map((c) => `<b>${esc(c.cmd)}</b> ${esc(c.help.replace(/^mods:\s*/, ''))}`).join(' · ')}</div>` : ''}
@@ -274,9 +275,24 @@ export class Hud {
     this.#tickLobbyStage();
   }
 
+  // "Type !join to play" — plus the phone app when the streamer has phone players on
+  // (ui/stream-host.js sets phoneJoin). Secret-card games can only be joined from a phone.
+  #joinCall(draw) {
+    const phone = this.phoneJoin ? `<b>Stream Board Games</b> app → Join a stream → <b>${esc(this.phoneJoin)}</b>` : '';
+    if (this.s.hidden && phone) return `📱 Play on your phone<div class="ls-phone">${phone}</div>`;
+    const chat = `Type <b>${this.p}join</b> ${draw ? 'to enter the draw' : 'to play'}`;
+    return phone ? `${chat}<div class="ls-phone">📱 or on your phone: ${phone}</div>` : chat;
+  }
+
   // Touch lobby: mode and player-count chips plus a big Play button (join + start right away).
   // Modes that need chat (a crowd seat) or only draw viewers at random are left out on a phone.
   #touchLobbyControls() {
+    if (this.s.follower && this.lan?.stream) {
+      // A viewer's phone in a stream: take a seat or give it up, like !join / !leave in chat.
+      const seated = this.seats.some((x) => x.occupant?.type === 'human' && x.occupant.user?.id === this.bridge.user?.id);
+      return `<div class="ls-touch"><div class="ls-waiting">${this.lan.waitingText ?? ''}</div>
+        ${seated ? `<button class="ls-chip" data-cmd="${this.p}leave">Leave my seat</button>` : `<button class="ls-play" data-cmd="${this.p}join">▶ Join the game</button>`}</div>`;
+    }
     if (this.s.follower) return `<div class="ls-touch"><div class="ls-waiting">⏳ ${this.lan?.waitingText ?? ''}</div></div>`;
     const m = this.s.manifest;
     const modes = (m.modes ?? []).filter((md) => !Object.values(md.seats ?? {}).includes('crowd') && !(md.entry === 'draw' && !Object.values(md.seats ?? {}).includes('host')));

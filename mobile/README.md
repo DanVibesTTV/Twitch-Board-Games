@@ -17,6 +17,16 @@ over an older one. (Builds made before that key existed were signed with a rando
 uninstall that version once.) Before APKs are shared with other people we create a real signing
 key once and keep it as a GitHub secret (losing it means users must uninstall).
 
+## Join a stream
+
+**📺 Join a stream** on the game select screen → the streamer's Twitch name → log in with Twitch
+(the app shows a code to confirm on twitch.tv/activate; the phone stays logged in). The phone then
+follows the streamer's overlay like a joined WiFi phone, over the internet: tap **Join the game** in
+the lobby, play your own moves, see only your own cards in Texas Hold 'em. Needs the streamer's
+companion app with **Phone players** on, and the session server (`docs/SESSION_SERVER.md`,
+default `https://games.danvibes.net`; `?bridge=local&sessionserver=http://127.0.0.1:8790` in a
+browser for testing). Patch versions may differ between app and streamer (x.y.*).
+
 ## Same-WiFi multiplayer
 
 1. One phone taps **📶 Host a WiFi game** on the game select screen (asks for a name once).

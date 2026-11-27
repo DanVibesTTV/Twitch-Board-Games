@@ -4,7 +4,10 @@
 
 import { runCompanion } from './companion.mjs';
 import { runServerCli } from './server.mjs';
+import { runSessionServerCli } from './session-server.mjs';
 
 const args = process.argv.slice(2);
-if (process.env.BOARDGAMES_ROLE === 'server') runServerCli(args);
+// "StreamBoardGames.exe --session-server": the server viewers' phones connect to (docs/SESSION_SERVER.md).
+if (args.includes('--session-server')) runSessionServerCli(args);
+else if (process.env.BOARDGAMES_ROLE === 'server') runServerCli(args);
 else runCompanion({ args, exe: true });

@@ -17,6 +17,9 @@ export class NodeBridge extends Bridge {
   capabilities = { chat: true, sendChat: true, whisper: false, predictions: true, extension: false, privateView: false };
   docks = 0;
   login = null; // the streamer's Twitch login
+  streamSession = null;      // phone players: what the companion opened (app/phone-sessions.mjs)
+  phoneUsers = new Set();    // ids of viewers connected with the phone app (ui/stream-host.js)
+  streamLive = false;
 
   constructor(options) {
     super(options);
@@ -39,13 +42,15 @@ export class NodeBridge extends Bridge {
     es.addEventListener('dockCommand', (ev) => {
       try { this.emit('chat', JSON.parse(ev.data)); } catch { /* ignore bad event */ }
     });
+    es.addEventListener('streamSession', (ev) => {
+      try { this.streamSession = JSON.parse(ev.data); } catch { return; }
+      this.emit('streamSession', this.streamSession);
+    });
     es.addEventListener('dock', (ev) => {
       let info;
       try { info = JSON.parse(ev.data); } catch { return; }
       this.docks = Number(info.connected) || 0;
-      const had = this.capabilities.privateView;
-      this.capabilities.privateView = this.docks > 0;
-      if (had !== this.capabilities.privateView) this.emit('capabilities', this.capabilities);
+      this.#updatePrivateView();
       this.emit('dock', { connected: this.docks });
     });
     es.addEventListener('twitch', (ev) => {
@@ -71,9 +76,24 @@ export class NodeBridge extends Bridge {
 
   async sendChat(text) { return this.post('/api/chat', { text }); }
 
-  // Only the streamer has a private screen here (the dock), and only while it is open.
+  // Private screens: the streamer's dock (while open), and viewers playing on their phones.
   privateViewFor(user) {
-    return this.docks > 0 && this.isStreamer(user);
+    return (this.docks > 0 && this.isStreamer(user)) || this.phoneUsers.has(user?.id);
+  }
+
+  // ui/stream-host.js: whether phones can connect, and who is connected.
+  setPhones({ live, users }) {
+    this.streamLive = !!live;
+    this.phoneUsers = new Set(users ?? []);
+    this.#updatePrivateView();
+  }
+
+  reportPhones(status) { return this.post('/api/phones/status', status); }
+
+  #updatePrivateView() {
+    const had = this.capabilities.privateView;
+    this.capabilities.privateView = this.docks > 0 || this.streamLive;
+    if (had !== this.capabilities.privateView) this.emit('capabilities', this.capabilities);
   }
 
   isStreamer(user) {

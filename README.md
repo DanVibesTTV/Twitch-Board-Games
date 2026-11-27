@@ -36,10 +36,12 @@ A small program that serves the overlay, logs in to Twitch itself and keeps ever
 Keep the exe in its folder: it loads the game files next to it, and updates replace those files.
 
 **Streamer dock (OBS):** in OBS choose **Docks → Custom Browser Docks…**, name it e.g. "Board Games" and use the URL **`http://127.0.0.1:8765/dock/`**. Only you see it:
-- In secret-card games (**Texas Hold 'em**) it shows **your own cards** and move buttons; the stream only shows them face down. While a dock is open, Hold 'em can be played on stream: you against bots (viewers need a private screen of their own, which comes later with the phone app).
+- In secret-card games (**Texas Hold 'em**) it shows **your own cards** and move buttons; the stream only shows them face down. While a dock is open, Hold 'em can be played on stream: you against bots, plus viewers on their phones (see *Phone players*).
 - Seat list with **kick** (lobby: frees the seat; during a game: a bot takes over), **Bot** / **Chat** per seat, bots count, mode, start and stop.
 - **Seat a player by Twitch username** in a chosen seat, e.g. whoever is next in your Lumia Stream or Streamer.bot queue. They show up as "not in chat yet" until they write anything in chat.
 - Every button is an ordinary mod command, so chatbot queues can do the same: `!bg seat 3 username`, `!bg kick 3` (or `!bg kick username`).
+
+**Phone players:** viewers play from the **Stream Board Games** Android app instead of chat: **📺 Join a stream** → your Twitch name → log in with Twitch once → **Join the game** in the lobby. Each phone shows the table, and in secret-card games like Texas Hold 'em only that player's own cards. Turn it on in the control panel (**Phone players**). It connects through a small *session server* that has to run somewhere the internet can reach; DanVibes runs one on a mini PC at home behind a free Cloudflare Tunnel — setup guide: [`docs/SESSION_SERVER.md`](docs/SESSION_SERVER.md).
 
 **macOS/Linux (or Windows with Node.js):**
 1. Install **Node.js 22 or newer** ([how](#installing-nodejs)).
