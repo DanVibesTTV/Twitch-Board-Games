@@ -40,13 +40,24 @@ export async function logInViewer(server, onCode, signal = {}) {
   let wait = Math.max(2, start.interval ?? 5) * 1000;
   const until = Date.now() + (start.expires_in ?? 1800) * 1000;
   while (Date.now() < until) {
-    await new Promise((r) => setTimeout(r, wait));
+    await waitOrReturn(wait);
     if (signal.cancelled) throw new Error('cancelled');
     const reply = await post(server, '/api/login/poll', { device_code: start.device_code });
     if (reply.pending) continue;
     return save(reply);
   }
   throw new Error('The code expired — try again.');
+}
+
+// Waits ms, or less when the app comes back to the screen (the viewer switched back after
+// authorizing on Twitch) — then the next check happens right away.
+function waitOrReturn(ms) {
+  return new Promise((resolve) => {
+    const done = () => { clearTimeout(timer); document.removeEventListener('visibilitychange', back); resolve(); };
+    const back = () => { if (document.visibilityState === 'visible') setTimeout(done, 300); };
+    const timer = setTimeout(done, ms);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', back);
+  });
 }
 
 // The current access token, refreshed first when it is about to run out.
