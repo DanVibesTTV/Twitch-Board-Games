@@ -273,6 +273,22 @@ body.touch .options li[data-cmd] { background: rgba(255,255,255,.12); border: 1p
 body.touch .options li[data-cmd] b { color: var(--accent); }
 body.touch .q-answers li[data-cmd] { min-height: 48px; }
 
+/* floating Roll button in the bottom-right corner of the board area */
+.hud-roll { display: none; }
+body.touch .hud-roll {
+  position: absolute; bottom: 3vh; right: calc(var(--panel-w) + 4vw); transform: scale(.6); transform-origin: 100% 100%;
+  display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 8px 24px 8px 16px !important;
+  border-radius: 999px; background: var(--accent) !important; color: #1d1a26 !important;
+  font-size: 19px; box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 0 4px rgba(255, 207, 90, .25);
+  opacity: 0; visibility: hidden; transition: opacity .2s, transform .25s cubic-bezier(.2,1.5,.4,1), visibility 0s .25s;
+}
+body.touch .hud-roll.show { opacity: 1; visibility: visible; transform: none; transition: opacity .2s, transform .35s cubic-bezier(.2,1.5,.4,1); animation: rollpulse 1.6s ease-in-out .5s infinite; }
+body.touch .hud-roll.show:active { transform: scale(.95); }
+.hud-roll .die { font-size: 1.5em; line-height: 1; }
+.hud-roll b { display: block; font-weight: 900; line-height: 1.1; }
+.hud-roll small { display: block; font-size: .55em; font-weight: 700; opacity: .75; }
+@keyframes rollpulse { 50% { box-shadow: 0 10px 30px rgba(0,0,0,.45), 0 0 0 10px rgba(255, 207, 90, .12); } }
+
 /* touch lobby controls */
 .ls-touch { margin-top: 16px; display: grid; gap: 10px; }
 .ls-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

@@ -182,6 +182,7 @@ export function createRenderer(stage, { seats }) {
       clearDecor();
       if (d.kind === 'choose' && game.state.phase === 'move') {
         const color = seats[d.seat].color;
+        const targets = [];
         d.options.forEach((opt, i) => {
           const at = toWorld(pos(opt.data.node));
           const ring = new THREE.Mesh(
@@ -195,7 +196,9 @@ export function createRenderer(stage, { seats }) {
           badge.position.copy(at).add(new THREE.Vector3(0, 0.5, 0));
           stage.scene.add(ring, badge);
           decor.push(ring, badge);
+          targets.push({ option: i, objects: [ring, badge] }); // tap the destination space
         });
+        stage.setTapTargets?.(targets);
       } else {
         // who acts: the player, or (final category) the opponent who picks
         const piece = pieces[d.seat];

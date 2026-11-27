@@ -131,6 +131,62 @@ export class Stage {
     this.#kick();
   }
 
+  // ── Touch play: tapping pieces on the board ──
+  // Renderers register what can be tapped for the current decision:
+  //   stage.setTapTargets([{ option: 0, objects: [pawnMesh, badge] }, …])
+  // A tap on (or near) one of those objects picks that option.
+  setTapTargets(targets) { this.tapTargets = targets ?? []; }
+
+  // Option index at a screen point (client px), or -1. Exact hits first; otherwise the target
+  // whose object is closest on screen, within `radius` px (fingers are bigger than pawns).
+  pickTap(clientX, clientY, radius = 44) {
+    const targets = this.tapTargets ?? [];
+    if (!targets.length) return -1;
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    if (!rect.width || !rect.height) return -1;
+    const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster ??= new THREE.Raycaster();
+    this.raycaster.setFromCamera(ndc, this.camera);
+    let best = -1;
+    let bestDist = Infinity;
+    for (const t of targets) {
+      const objs = (t.objects ?? []).filter((o) => o?.parent);
+      if (!objs.length) continue;
+      const hit = this.raycaster.intersectObjects(objs, true)[0];
+      if (hit && hit.distance < bestDist) { bestDist = hit.distance; best = t.option; }
+    }
+    if (best !== -1) return best;
+    const p = new THREE.Vector3();
+    let bestPx = radius;
+    for (const t of targets) {
+      for (const o of t.objects ?? []) {
+        if (!o?.parent) continue;
+        o.getWorldPosition(p).project(this.camera);
+        if (p.z > 1) continue; // behind the camera
+        const px = Math.hypot(((p.x + 1) / 2) * rect.width + rect.left - clientX, ((1 - p.y) / 2) * rect.height + rect.top - clientY);
+        if (px < bestPx) { bestPx = px; best = t.option; }
+      }
+    }
+    return best;
+  }
+
+  // Calls onTap(optionIndex) for short taps on a tap target (drags and long presses are ignored).
+  enableTap(onTap) {
+    const el = this.renderer.domElement;
+    let down = null;
+    el.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+    el.addEventListener('pointerup', (e) => {
+      if (!down) return;
+      const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y);
+      const quick = performance.now() - down.t < 600;
+      down = null;
+      if (moved > 14 || !quick) return;
+      const option = this.pickTap(e.clientX, e.clientY);
+      if (option !== -1) onTap(option);
+    });
+    el.addEventListener('pointercancel', () => { down = null; });
+  }
+
   // Runs fn(t) with t going 0→1 over `ms`, eased. Resolves when done.
   animate(ms, fn, easing = ease.inOut) {
     return new Promise((resolve) => {

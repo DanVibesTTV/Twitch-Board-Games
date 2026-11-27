@@ -65,10 +65,14 @@ async function main() {
   };
   const stats = bool('stats', true) ? new StatsStore() : null;
   const session = new Session({ bridge, registry, view: createView(stage), config, stats });
+  const send = (text) => (bridge.send ? bridge.send(text) : bridge.inject?.(text));
   new Hud(document.getElementById('hud'), {
     session, bridge, registry, prefix: config.prefix,
-    touch: touch ? { send: (text) => (bridge.send ? bridge.send(text) : bridge.inject?.(text)) } : null,
+    touch: touch ? { send } : null,
   });
+  // Tapping a piece on the board = the same "!n" as tapping the option in the side panel.
+  // The Session ignores it when it isn't this player's turn.
+  if (touch) stage.enableTap((option) => send(`${config.prefix}${option + 1}`));
   if (bridgeKind === 'dev') mountDevConsole(document.body, bridge);
 
   // After the companion app installed an update, reload into the new version once

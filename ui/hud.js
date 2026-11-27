@@ -33,7 +33,8 @@ export class Hud {
     this.banner = el('div', 'hud-banner');
     this.questionBox = el('section', 'hud-question');
     this.lobbyStage = el('section', 'hud-lobby');
-    root.append(this.side, this.menu, this.lobbyStage, this.questionBox, this.toasts, this.banner);
+    this.rollButton = el('button', 'hud-roll'); // touch: big floating Roll button over the board
+    root.append(this.side, this.menu, this.lobbyStage, this.questionBox, this.toasts, this.banner, this.rollButton);
     if (touch) {
       root.addEventListener('click', (e) => {
         const target = e.target.closest?.('[data-cmd]');
@@ -74,6 +75,7 @@ export class Hud {
 
   #phase(phase) {
     this.root.dataset.phase = phase;
+    if (phase !== 'playing') this.#renderRollButton(null);
     this.banner.classList.remove('show');
     delete this.banner.dataset.cmd;
     this.#hideQuestion();
@@ -297,6 +299,7 @@ export class Hud {
   #renderDecision(payload) {
     this.currentDecision = payload;
     this.#renderSeats();
+    this.#renderRollButton(payload);
     if (!payload) return;
     const { decision: d, seat, occupant } = payload;
     if (d.question) this.#renderQuestion(payload);
@@ -304,7 +307,7 @@ export class Hud {
     const who = occupant.type === 'human' ? occupant.user.name : occupant.type === 'crowd' ? 'Chat' : 'Bot';
     const showOptions = d.kind !== 'roll' || occupant.type !== 'bot';
     const tap = this.touch && occupant.type === 'human';
-    const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : 'Tap your move')
+    const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : 'Tap a numbered piece on the board, or a move below')
       : d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
       : occupant.type === 'crowd' ? 'Chat votes — majority wins'
       : occupant.type === 'bot' ? 'Bot is thinking…'
@@ -315,6 +318,23 @@ export class Hud {
       ${this.#timerBar(payload.endsAt, payload.total)}
       <div class="hint">${hint}</div>
       ${!showOptions || d.question ? '' : this.#optionList(d, tap)}`;
+  }
+
+  // Touch: when it's the local player's turn and the game offers a roll (option alias "roll"),
+  // a big button pops up over the board. Other choices are tapped on the board or in the panel.
+  #renderRollButton(payload) {
+    const btn = this.rollButton;
+    const d = payload?.decision;
+    const i = this.touch && payload?.occupant?.type === 'human' && !d.question
+      ? d.options.findIndex((o) => o.alias === 'roll' && !o.disabled && !o.hidden) : -1;
+    if (i === -1) { btn.classList.remove('show'); delete btn.dataset.cmd; return; }
+    // "Roll 3 dice again (1 left)  · !roll" → "Roll 3 dice again (1 left)"
+    const sub = d.options[i].label.replace(/\s*·\s*!\w+\s*$/, '');
+    btn.innerHTML = `<span class="die">🎲</span><span><b>Roll</b>${sub && !/^roll the (die|dice)$/i.test(sub) ? `<small>${esc(sub)}</small>` : ''}</span>`;
+    btn.dataset.cmd = `${this.p}${i + 1}`;
+    btn.classList.remove('show');
+    void btn.offsetWidth; // restart the pop-in animation for every new roll
+    btn.classList.add('show');
   }
 
   // Hidden options (shortcuts) aren't listed; numbers stay their position in the full list.

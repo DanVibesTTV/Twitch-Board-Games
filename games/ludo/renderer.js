@@ -131,6 +131,7 @@ export function createRenderer(stage, { seats }) {
     showDecision(d, game) {
       clearDecor();
       if (d.kind !== 'choose') return;
+      const targets = [];
       d.options.forEach((opt, i) => {
         const m = opt.data;
         const pawn = pawns[d.seat][m.pawn];
@@ -152,7 +153,9 @@ export function createRenderer(stage, { seats }) {
         label.position.copy(target).add(new THREE.Vector3(0, 0.28, 0));
         stage.scene.add(ring, label);
         decor.push(ring, label);
+        targets.push({ option: i, objects: [pawn, ring, label] }); // tap the pawn or where it lands
       });
+      stage.setTapTargets?.(targets);
       stage.invalidate();
     },
 

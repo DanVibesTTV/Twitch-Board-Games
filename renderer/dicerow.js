@@ -65,10 +65,13 @@ export class DiceRow {
       d.group.add(badge);
       this.badges.push(badge);
     });
+    // Tapping die i (or its badge) picks option i: the hold step lists "hold/release die i" first.
+    this.stage.setTapTargets?.(this.dice.map((d, i) => ({ option: i, objects: [d.group] })));
     this.stage.invalidate();
   }
 
   clearBadges() {
+    if (this.badges.length) this.stage.setTapTargets?.([]);
     for (const b of this.badges) b.removeFromParent();
     this.badges.length = 0;
     this.stage.invalidate();
