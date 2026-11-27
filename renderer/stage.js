@@ -53,11 +53,15 @@ export class Stage {
   }
 
   // Positions the camera so a square board of `size` fits, viewed at `tilt` degrees from vertical.
-  frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0] } = {}) {
+  // besides: world units of things to the right of the board (e.g. the die) that must stay in view
+  // in the touch layout. On the desktop the game's center offset already leaves room for them.
+  frame(size, { tilt = 38, fill = 0.92, center = [0, 0, 0], besides = 0 } = {}) {
     this.viewArgs = null;
+    const args = [size, { tilt, fill, center, besides }];
     // Games shift the board sideways (center x) to leave room for the HUD's side panel. When the
-    // stage itself already stops at the panel (touch layout), that shift is switched off.
-    if (!this.panelOffsets) center = [0, center[1], center[2]];
+    // stage itself already stops at the panel (touch layout), that shift is replaced by just
+    // enough room for `besides`.
+    if (!this.panelOffsets) center = [besides / 2, center[1], center[2]];
     this.camera.fov = DEFAULT_FOV;
     this.#applyShift(0);
     const vfov = THREE.MathUtils.degToRad(this.camera.fov);
@@ -66,7 +70,7 @@ export class Stage {
     const needH = size * (0.82 + 0.18 * Math.cos(THREE.MathUtils.degToRad(tilt))) / fill;
     // Some games overfill (fill > 1) on purpose for a 16:9 screen. On a narrower touch stage
     // that would cut the board off at the sides, so the width always fits there.
-    const needW = size / (this.panelOffsets ? fill : Math.min(fill, 0.9));
+    const needW = this.panelOffsets ? size / fill : size / Math.min(fill, 0.9) + besides;
     const distH = needH / 2 / Math.tan(vfov / 2);
     const distW = needW / 2 / (Math.tan(vfov / 2) * aspect);
     const dist = Math.max(distH, distW);
@@ -74,7 +78,7 @@ export class Stage {
     this.target.set(...center);
     this.camera.position.set(center[0], center[1] + Math.cos(a) * dist, center[2] + Math.sin(a) * dist);
     this.camera.lookAt(this.target);
-    this.frameArgs = [size, { tilt, fill, center }];
+    this.frameArgs = args;
     this.invalidate();
   }
 

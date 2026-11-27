@@ -72,11 +72,12 @@ export function createRenderer(stage, { seats }) {
 
   return {
     async intro(game) {
-      stage.frame(SIZE, { tilt: 36, fill: 0.9, center: [2.2, 0, 0.3] });
+      stage.frame(SIZE, { tilt: 36, fill: 0.9, center: [2.2, 0, 0.3], besides: 2.1 }); // besides: the die
       board = await unfoldBoard(stage, { boardTex, backTex, size: SIZE, thickness: THICK });
 
       die = new Die(stage, { size: CELL * 1.15 });
-      die.place(SIZE / 2 + 1.1, 0, SIZE / 2 - 1.2);
+      // Phone layout: the die sits beside the middle of the board, clear of the Roll button in the corner.
+      die.place(SIZE / 2 + 1.1, 0, stage.panelOffsets ? SIZE / 2 - 1.2 : 0);
 
       // pawns drop into their yards one color at a time
       const targets = layout(game.state);

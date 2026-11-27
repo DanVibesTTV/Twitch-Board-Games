@@ -126,11 +126,12 @@ export function createRenderer(stage, { seats }) {
       boardTex = new THREE.CanvasTexture(drawBoard(slots, 1024));
       boardTex.colorSpace = THREE.SRGBColorSpace;
       boardTex.anisotropy = 4;
-      stage.frame(BOARD_SIZE, { tilt: 32, fill: 0.92, center: [2.3, 0, 0.35] });
+      stage.frame(BOARD_SIZE, { tilt: 32, fill: 0.92, center: [2.3, 0, 0.35], besides: 2.0 }); // besides: the die
       board = await unfoldBoard(stage, { boardTex, backTex, size: BOARD_SIZE, thickness: THICK, edgeColor: 0x0d1430 });
 
       die = new Die(stage, { size: 0.9, faceColor: '#0b1230', pipColor: '#7fe8ff', onePipColor: '#ff4fb4', glow: true });
-      die.place(BOARD_SIZE / 2 + 1.2, 0, BOARD_SIZE / 2 - 1.4);
+      // Phone layout: the die sits beside the middle of the board, clear of the Roll button in the corner.
+      die.place(BOARD_SIZE / 2 + 1.2, 0, stage.panelOffsets ? BOARD_SIZE / 2 - 1.4 : 0);
 
       const targets = layout(game.state);
       await Promise.all(seats.map((seat, i) => {
