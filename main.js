@@ -24,6 +24,9 @@ import { startAppUpdates } from './ui/app-update.js';
 import { LanUi, savedPlayerName } from './ui/lan-ui.js';
 import { createTransport } from './net/transport.js';
 import { startDockLink } from './ui/dock-link.js';
+import { startStreamHost } from './ui/stream-host.js';
+import { DEFAULT_SESSION_SERVER } from './net/relay.js';
+import { savedViewer } from './ui/twitch-viewer.js';
 
 const q = new URLSearchParams(location.search);
 const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
@@ -52,14 +55,23 @@ async function main() {
   if (touch) document.body.classList.add('touch');
   applyBackground(q.get('bg') ?? (bridgeKind === 'dev' || local || bool('preview', false) ? 'dark' : 'transparent'));
 
+  // Phone app: streams to join go through the session server (net/relay.js). ?sessionserver= for
+  // testing; a browser with ?bridge=local only gets it when given.
+  const sessionServer = local
+    ? (q.get('sessionserver') ?? document.querySelector('meta[name="boardgames-session-server"]')?.content ?? (isApp ? DEFAULT_SESSION_SERVER : null))
+    : null;
+  // Joined to a stream: this phone plays as the viewer's Twitch account.
+  const streamName = sessionServer ? q.get('stream') : null;
+  const viewer = streamName ? savedViewer() : null;
+
   const bridge = createBridge(bridgeKind, {
     channel: q.get('channel'),
     token: q.get('token'),
     host: q.get('host') ?? undefined,
     port: q.has('port') ? Number(q.get('port')) : undefined,
     secure: bool('secure', false),
-    playerName: q.get('name') ?? (local ? savedPlayerName() : null),
-    playerId: local ? (q.get('player') ?? playerId()) : undefined, // ?player= for testing several tabs
+    playerName: viewer?.user.name ?? q.get('name') ?? (local ? savedPlayerName() : null),
+    playerId: viewer?.user.id ?? (local ? (q.get('player') ?? playerId()) : undefined), // ?player= for testing several tabs
   });
 
   // With the companion app, stats and trivia settings live in a file on the PC.
@@ -88,12 +100,14 @@ async function main() {
   const transport = local ? createTransport(q.get('lanvia') ?? (isApp ? 'native' : 'none')) : null;
   const joinAddress = transport ? q.get('join') : null;
   const appVersion = await fetch('./version.json', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).then((v) => v?.version ?? null).catch(() => null);
-  const session = new Session({ bridge, registry, view: createView(stage), config, stats, follower: !!joinAddress });
+  const session = new Session({ bridge, registry, view: createView(stage), config, stats, follower: !!joinAddress || !!streamName });
 
   // Header line: "on this device · v0.13.0 · hosting · 2 joined"
   const status = { version: null, lan: null };
   const showStatus = () => local && bridge.status('connected', [status.lan ?? 'on this device', status.version && `v${status.version}`].filter(Boolean).join(' · '));
-  const lanUi = transport ? new LanUi({ session, bridge, transport, appVersion, joinAddress, setStatus: (t) => { status.lan = t; showStatus(); } }) : null;
+  const lanUi = transport || sessionServer
+    ? new LanUi({ session, bridge, transport, appVersion, joinAddress, streamName, sessionServer, setStatus: (t) => { status.lan = t; showStatus(); } })
+    : null;
 
   // A joined phone's taps go to the host; otherwise straight into this phone's Session.
   const send = (text) => (lanUi?.joined ? lanUi.send(text) : bridge.send ? bridge.send(text) : bridge.inject?.(text));
@@ -109,6 +123,8 @@ async function main() {
   if (bridgeKind === 'dev') mountDevConsole(document.body, bridge);
   // Companion app: the streamer dock (OBS custom browser dock) gets its own private snapshot.
   if (bridge.pushDock) startDockLink({ session, bridge });
+  // Companion app: viewers' phones join through the session server ("Phone players" in the panel).
+  if (bridge.setPhones) startStreamHost({ session, bridge, hud, appVersion: () => bridge.version });
 
   // After the companion app installed an update, reload into the new version once
   // nothing is being played (right away on the game select screen).
@@ -120,7 +136,7 @@ async function main() {
 
   await bridge.connect();
   showStatus();
-  if (q.get('game') && !joinAddress) session.openLobby(q.get('game'), q.get('mode') || null);
+  if (q.get('game') && !joinAddress && !streamName) session.openLobby(q.get('game'), q.get('mode') || null);
 
   // Android app only: over-the-air updates of the game files (does nothing in a browser).
   if (local) {

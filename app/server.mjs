@@ -13,6 +13,7 @@ import { spawn } from 'node:child_process';
 import { Store } from './store.mjs';
 import { Twitch } from './twitch.mjs';
 import { Updater, DEFAULT_REPO } from './updater.mjs';
+import { PhoneSessions } from './phone-sessions.mjs';
 
 export const RESTART_CODE = 75;
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
@@ -40,6 +41,12 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   const send = (res, event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   const broadcast = (event, data) => { for (const res of clients) send(res, event, data); };
   twitch.on('chat', (msg) => broadcast('chat', msg));
+
+  // ---- Phone players (stream sessions, app/phone-sessions.mjs) ----
+  // The overlay hosts viewers' phones through the session server; we only open the session.
+  const phones = new PhoneSessions({ store, twitch });
+  phones.on('change', (st) => broadcast('streamSession', st));
+  phones.on('status', (st) => broadcast('streamStatus', st));
 
   // ---- Streamer dock ----
   // The overlay (where the Session runs) POSTs its dock snapshot to /api/dock/state; it goes only
@@ -84,6 +91,8 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       send(res, 'twitch', twitch.state);
       send(res, 'twitchBot', twitch.botState);
       send(res, 'dock', dockInfo());
+      send(res, 'streamSession', phones.public);
+      send(res, 'streamStatus', phones.status);
       clients.add(res);
       const ping = setInterval(() => res.write(': ping\n\n'), 25000);
       req.on('close', () => { clearInterval(ping); clients.delete(res); });
@@ -165,6 +174,16 @@ export async function startServer({ port: portArg, openPanel } = {}) {
       await store.saveSettings(patch);
       return json(res, 200, { ok: true, restartNeeded: 'twitchClientId' in body || 'updateRepo' in body });
     }
+    if (req.method === 'POST' && path === '/api/phones') {
+      try {
+        await phones.configure({ enabled: body.enabled, server: body.server });
+        return json(res, 200, { ok: true, phones: phones.public });
+      } catch (err) { return json(res, 400, { error: err.message }); }
+    }
+    if (req.method === 'POST' && path === '/api/phones/status') {
+      phones.report(body);
+      return json(res, 200, { ok: true });
+    }
     if (req.method === 'POST' && path === '/api/restart') { json(res, 200, { ok: true }); setTimeout(() => shutdown(RESTART_CODE), 300); return; }
     if (req.method === 'POST' && path === '/api/open-data') { openPath(store.dir); return json(res, 200, { ok: true }); }
     return json(res, 404, { error: 'unknown endpoint' });
@@ -189,6 +208,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
     if (stopping) return;
     stopping = true;
     twitch.close();
+    phones.close();
     for (const c of clients) c.end();
     await store.flush();
     server.close();
@@ -220,6 +240,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   console.log('');
 
   await twitch.start();
+  if (phones.settings.enabled) phones.open();
 
   const checkUpdates = async () => {
     const st = await updater.check();
@@ -233,7 +254,7 @@ export async function startServer({ port: portArg, openPanel } = {}) {
   }
 
   if (openPanel ?? settings.openPanel !== false) openPath(`${base}/panel/`);
-  return { server, store, twitch, updater, port };
+  return { server, store, twitch, updater, port, phones };
 }
 
 function json(res, status, value) {

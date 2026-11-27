@@ -76,6 +76,19 @@
         While the dock is open, Texas Hold 'em is playable on stream (you against bots).</p>
     </section>
 
+    <section class="card" id="phones">
+      <h2>Phone players <span id="phones-state" class="pill">off</span></h2>
+      <p>Viewers play from their phones with the <b>Stream Board Games</b> Android app: <b>Join a stream</b> → your Twitch name.
+        They log in with Twitch, so you always know who is who. In secret-card games like Texas Hold 'em each phone shows only that player's own cards.</p>
+      <label class="row"><input type="checkbox" id="phones-enabled"> Let viewers join from the phone app</label>
+      <details>
+        <summary class="muted">Session server</summary>
+        <div class="copy"><input id="phones-server" placeholder="https://games.danvibes.net" spellcheck="false"><button id="phones-save">Save</button></div>
+        <p class="muted">The server phones connect through. Leave the default unless you run your own (see docs/SESSION_SERVER.md).</p>
+      </details>
+      <p id="phones-detail" class="muted"></p>
+    </section>
+
     <section class="card" id="updates">
       <h2>Updates</h2>
       <div id="update-body">Checking…</div>

@@ -219,6 +219,8 @@ body:has(.dev-console) .hud-toasts { bottom: 72px; }
 .ls-join { font-size: 1.6em; font-weight: 800; }
 .ls-join b { color: var(--accent); }
 .ls-count-label { font-size: .55em; font-weight: 600; color: var(--muted); margin-top: 2px; }
+.ls-phone { font-size: .5em; font-weight: 600; color: var(--muted); margin-top: 4px; }
+.ls-phone b { color: var(--text); }
 .ls-count-label b { color: var(--text); }
 .ls-countdown { text-align: center; min-width: 5em; }
 .ls-secs { font-size: 3.2em; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent); }
@@ -335,6 +337,8 @@ body.touch #hud [data-lan], body.touch #hud [data-lan] * { pointer-events: auto;
 .lan-players span { padding: 2px 10px; border-radius: 99px; background: rgba(255,255,255,.1); font-weight: 700; }
 .lan-players em, .lan-found em { color: var(--muted); font-style: normal; }
 .lan-hint { font-size: .85em; color: var(--muted); }
+.lan-code { margin: 8px 0; text-align: center; font-size: 30px; font-weight: 900; letter-spacing: .12em; color: var(--accent); user-select: text; -webkit-user-select: text; }
+.lan-card a { color: var(--accent); }
 .lan-btn { min-height: 40px; padding: 0 16px !important; border-radius: 12px; background: var(--accent) !important; color: #1d1a26 !important; font-weight: 800; font-size: 15px; cursor: pointer; }
 .lan-btn.ghost { background: rgba(255,255,255,.12) !important; color: var(--text) !important; }
 .lan-name { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }

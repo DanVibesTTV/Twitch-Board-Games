@@ -209,7 +209,8 @@ export class Session extends Emitter {
     this.#emitSeats();
     this.#emitEntrants();
     const p = this.config.prefix;
-    const how = this.#isDraw() ? `Type ${p}join to enter the draw` : `Type ${p}join to play (or ${p}join ${manifest.seats.find((x) => !x.occupant)?.id ?? manifest.seats[0].id})`;
+    const how = this.hidden && this.bridge.streamLive ? `Play it on your phone: Stream Board Games app → Join a stream → ${this.bridge.login ?? 'the streamer'}`
+      : this.#isDraw() ? `Type ${p}join to enter the draw` : `Type ${p}join to play (or ${p}join ${manifest.seats.find((x) => !x.occupant)?.id ?? manifest.seats[0].id})`;
     this.say(`${manifest.name}${this.mode ? ` — ${this.mode.name}` : ''} lobby is open! ${how}.`);
     const host = this.#hostSeat();
     if (host) {
@@ -382,7 +383,9 @@ export class Session extends Emitter {
   }
 
   #noPrivateScreen(name) {
-    this.say(`${this.manifest.name} has secret cards, so it needs a private screen — for now only the streamer can play it (with the streamer dock), against bots. Sorry ${name}!`);
+    this.say(this.bridge.streamLive
+      ? `@${name} ${this.manifest.name} has secret cards — play it from your phone: Stream Board Games app → Join a stream → ${this.bridge.login ?? 'the streamer'}.`
+      : `${this.manifest.name} has secret cards, so it needs a private screen — for now only the streamer can play it (with the streamer dock), against bots. Sorry ${name}!`);
   }
 
   // Seat by number ("2"), id or name ("red").

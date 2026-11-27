@@ -4,8 +4,16 @@
 // Hosting happens in place: the phone's Session becomes the host (net/lan.js LanHost).
 // Joining reloads the page with ?join=<address>; main.js then starts a follower Session and this
 // class connects it (LanClient). Leaving reloads without ?join.
+//
+// Join a stream (needs a session server, net/relay.js): the same follower Session, connected to a
+// streamer's overlay over the internet. Twitch login first (ui/twitch-viewer.js), then the page
+// reloads with ?stream=<streamer login>.
 
 import { LanHost, LanClient } from '../net/lan.js';
+import { RelayClient } from '../net/relay.js';
+import { savedViewer, logInViewer, logOutViewer, viewerToken } from './twitch-viewer.js';
+
+const STREAM_KEY = 'boardgames.stream.last';
 
 const NAME_KEY = 'boardgames.player.name';
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -18,8 +26,8 @@ export function savedPlayerName() { return store.get(NAME_KEY); }
 
 export class LanUi {
   // transport: from net/transport.js (null = no WiFi play here). joinAddress: set on a joined phone.
-  constructor({ session, bridge, transport, appVersion = null, joinAddress = null, setStatus = () => {} }) {
-    Object.assign(this, { session, bridge, transport, appVersion, joinAddress, setStatus });
+  constructor({ session, bridge, transport, appVersion = null, joinAddress = null, streamName = null, sessionServer = null, setStatus = () => {} }) {
+    Object.assign(this, { session, bridge, transport, appVersion, joinAddress, streamName, sessionServer, setStatus });
     this.host = null;
     this.client = null;
     this.hostName = null;
@@ -34,22 +42,25 @@ export class LanUi {
     });
     document.body.append(this.modal);
     if (joinAddress) this.#join(joinAddress);
+    else if (streamName) this.#joinStream(streamName);
   }
 
   get available() { return !!this.transport; }
-  get joined() { return !!this.joinAddress; }
+  get joined() { return !!this.joinAddress || !!this.streamName; }
+  get stream() { return !!this.streamName; }
   attach(hud) { this.hud = hud; }
 
   // What the joined phone's HUD shows instead of its own controls.
   get waitingText() {
-    const who = this.hostName ? esc(this.hostName) : 'the host';
+    const who = this.hostName ? esc(this.hostName) : this.stream ? esc(this.streamName) : 'the host';
+    if (this.offline) return `${who}'s overlay is offline — waiting for it to come back…`;
     if (this.client?.waiting) return `A game is running at ${who}'s — you join the next one.`;
     return this.session.phase === 'lobby' ? `Waiting for ${who} to start…` : `Waiting for ${who} to pick a game…`;
   }
 
   // Block on the game select screen (hosting status or the Host/Join buttons).
   menuHtml() {
-    if (!this.available || this.joined) return '';
+    if (this.joined || (!this.available && !this.sessionServer)) return '';
     if (this.host) {
       const players = this.host.players;
       const addr = this.host.info?.addresses?.find((a) => !a.startsWith('bc:')) ?? this.host.info?.addresses?.[0] ?? '';
@@ -62,9 +73,10 @@ export class LanUi {
     }
     const name = savedPlayerName();
     return `<div class="lan-box" data-lan-box>
-      <button class="lan-btn" data-lan="host">📶 Host a WiFi game</button>
-      <button class="lan-btn" data-lan="join">🔗 Join a WiFi game</button>
-      ${name ? `<button class="lan-btn ghost lan-name" data-lan="rename" aria-label="Change your name">✏️ ${esc(name)}</button>` : ''}
+      ${this.available ? `<button class="lan-btn" data-lan="host">📶 Host a WiFi game</button>
+      <button class="lan-btn" data-lan="join">🔗 Join a WiFi game</button>` : ''}
+      ${this.sessionServer ? '<button class="lan-btn" data-lan="stream">📺 Join a stream</button>' : ''}
+      ${name && this.available ? `<button class="lan-btn ghost lan-name" data-lan="rename" aria-label="Change your name">✏️ ${esc(name)}</button>` : ''}
     </div>`;
   }
 
@@ -79,6 +91,10 @@ export class LanUi {
         const v = this.modal.querySelector('input[name="address"]')?.value.trim();
         if (v) this.#goJoin(v);
       }
+      if (act === 'stream') this.#openStream();
+      if (act === 'stream-go') await this.#goStream(this.modal.querySelector('input[name="streamer"]')?.value);
+      if (act === 'twitch-logout') { logOutViewer(); this.#openStream(); }
+      if (act === 'login-cancel') { this.loginSignal && (this.loginSignal.cancelled = true); this.#closeModal(); }
       if (act === 'cancel') this.#closeModal();
       if (act === 'leave') this.#leave();
     } catch (err) {
@@ -189,10 +205,94 @@ export class LanUi {
     }
   }
 
+  // ── joining a stream ──
+  #openStream() {
+    const viewer = savedViewer();
+    this.#showModal(`
+      <h2>Join a stream</h2>
+      <p>Play on a streamer's table from your phone. They need the Stream Board Games companion app with <b>Phone players</b> turned on.</p>
+      <div class="lan-row"><input name="streamer" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Streamer's Twitch name" enterkeyhint="go" maxlength="26" value="${esc(store.get(STREAM_KEY) ?? '')}"><button class="lan-btn" data-lan="stream-go" data-enter>Join</button></div>
+      <p class="lan-hint">${viewer ? `Logged in with Twitch as <b>${esc(viewer.user.name)}</b> · <a href="#" data-lan="twitch-logout">log out</a>` : 'You log in with Twitch once, so the streamer knows who you are.'}</p>
+      <div class="lan-row"><button class="lan-btn ghost" data-lan="cancel">Cancel</button></div>`);
+    setTimeout(() => this.modal.querySelector('input')?.focus(), 50);
+  }
+
+  async #goStream(raw) {
+    const name = String(raw ?? '').trim().replace(/^@/, '').toLowerCase();
+    if (!/^\w{1,25}$/.test(name)) return this.modal.querySelector('input')?.focus();
+    store.set(STREAM_KEY, name);
+    this.modal.querySelector('input')?.blur();
+    let info = null;
+    try {
+      info = await fetch(`${this.sessionServer}/api/sessions/${encodeURIComponent(name)}`).then((r) => r.json());
+    } catch {
+      return this.#message("Couldn't reach the stream", 'Check your internet connection and try again.');
+    }
+    if (!info.open) return this.#message('Not open yet', `<b>${esc(name)}</b> hasn't turned on phone players. Ask them to switch on <b>Phone players</b> in the companion app.`);
+    if (!savedViewer() && !(await this.#twitchLogin())) return;
+    const q = new URLSearchParams(location.search);
+    q.delete('join');
+    q.set('stream', name);
+    location.search = q.toString();
+  }
+
+  // Twitch device login: shows the code, waits until it is confirmed. Resolves true when logged in.
+  async #twitchLogin() {
+    this.loginSignal = { cancelled: false };
+    this.#showModal('<h2>Log in with Twitch</h2><p>Getting a code…</p>');
+    try {
+      await logInViewer(this.sessionServer, ({ user_code, verification_uri }) => {
+        this.#showModal(`
+          <h2>Log in with Twitch</h2>
+          <p>Open <a href="${esc(verification_uri)}" target="_blank" rel="noopener"><b>twitch.tv/activate</b></a> and enter this code:</p>
+          <div class="lan-code">${esc(user_code)}</div>
+          <p class="lan-hint">This phone stays logged in. Waiting for Twitch…</p>
+          <div class="lan-row"><a class="lan-btn" href="${esc(verification_uri)}?device-code=${encodeURIComponent(user_code)}" target="_blank" rel="noopener">Open Twitch</a><button class="lan-btn ghost" data-lan="login-cancel">Cancel</button></div>`);
+      }, this.loginSignal);
+      return true;
+    } catch (err) {
+      if (err.message !== 'cancelled') this.#message("Couldn't log in", esc(err.message));
+      return false;
+    }
+  }
+
+  async #joinStream(name) {
+    if (!savedViewer()) return this.#message('Log in with Twitch', 'Log in again to join the stream.', true);
+    this.setStatus('connecting…');
+    const transport = new RelayClient({ server: this.sessionServer, getToken: () => viewerToken(this.sessionServer) });
+    transport.on('hostGone', () => { this.offline = true; this.#status(); this.hud?.refresh(); });
+    transport.on('hostBack', () => { this.offline = false; this.#status(); this.hud?.refresh(); });
+    transport.on('reconnecting', () => this.setStatus('reconnecting…'));
+    transport.on('reconnected', () => this.#status());
+    this.client = new LanClient({
+      session: this.session,
+      transport,
+      user: this.bridge.user,
+      appVersion: this.appVersion,
+      onChange: (c) => {
+        if (c.hostName) this.hostName = c.hostName;
+        if (c.error) return this.#message("Couldn't join", esc(c.error), true);
+        if (c.closed) return this.#message('Disconnected', esc(c.reason || 'The connection to the stream was lost.'), true);
+        this.#status();
+        this.hud?.refresh();
+      },
+    });
+    try {
+      const info = await this.client.join(name);
+      this.offline = !transport.ws || info?.live === false;
+      this.hostName ??= transport.streamer;
+      this.#status();
+      this.hud?.refresh();
+    } catch (err) {
+      this.#message("Couldn't join", esc(err.message ?? err), true);
+    }
+  }
+
   #leave() {
     this.client?.leave().catch(() => {});
     const q = new URLSearchParams(location.search);
     q.delete('join');
+    q.delete('stream');
     location.search = q.toString();
   }
 
@@ -201,7 +301,8 @@ export class LanUi {
 
   // ── modal + status ──
   #status() {
-    if (this.joined) this.setStatus(this.hostName ? `at ${this.hostName}'s` : 'connecting…');
+    if (this.stream) this.setStatus(this.hostName ? `📺 ${this.hostName}'s stream${this.offline ? ' · offline' : ''}` : 'connecting…');
+    else if (this.joined) this.setStatus(this.hostName ? `at ${this.hostName}'s` : 'connecting…');
     else if (this.host) this.setStatus(`hosting · ${this.host.players.length} joined`);
     else this.setStatus(null);
   }

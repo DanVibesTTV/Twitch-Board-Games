@@ -17,16 +17,25 @@
 // the deck. The host sends each phone only its own view:
 //   hstart { spec: { …, view } }   hupdate { view, events, log, seat }   hover { ranking, draw }
 // and decisions carry the decision itself (decision { ms, total, decision }).
+//
+// Stream sessions (stream: true, transport = RelayHost from net/relay.js): the host is the
+// streamer's overlay and the phones are viewers on the internet. Differences: identities come
+// from the session server (checked Twitch logins, transport.userOf), nobody is seated
+// automatically (viewers tap Join, like typing !join), and a phone that drops keeps its seat for
+// a grace period (a reconnect within it takes the seat back; hidden games resend its view).
 
 const PROTOCOL = 1;
+const release = (v) => String(v).split('.').slice(0, 2).join('.');
 
 export class LanHost {
   // onChange(): the player list or status changed (for the UI).
-  constructor({ session, transport, hostName, appVersion = null, onChange = () => {} }) {
-    Object.assign(this, { session, transport, hostName, appVersion, onChange });
+  constructor({ session, transport, hostName, appVersion = null, onChange = () => {}, stream = false, graceMs = 30000 }) {
+    Object.assign(this, { session, transport, hostName, appVersion, onChange, stream, graceMs });
     this.peers = new Map(); // peerId → { user } (user is null until hello)
+    this.away = new Map();  // stream: user id → { user, timer } (dropped, seat kept for graceMs)
     this.offs = [];
     this.info = null;
+    this.hiddenSpec = null;
   }
 
   get players() { return [...this.peers.values()].filter((p) => p.user).map((p) => p.user); }
@@ -42,7 +51,7 @@ export class LanHost {
     on(t, 'peerLeft', ({ peerId }) => this.#peerLeft(peerId));
     on(s, 'phase', (ph) => {
       if (ph === 'menu' || ph === 'lobby') this.#broadcast(this.#state());
-      if (ph === 'lobby') for (const u of this.players) s.join(u); // everyone connected plays
+      if (ph === 'lobby' && !this.stream) for (const u of this.players) s.join(u); // everyone connected plays
     });
     on(s, 'seats', (seats) => {
       if (s.phase === 'lobby') this.#broadcast(this.#state());
@@ -51,11 +60,17 @@ export class LanHost {
     on(s, 'lanStart', (spec) => this.#broadcast({ t: 'start', spec }));
     on(s, 'lanApply', (m) => this.#broadcast({ t: 'apply', ...m }));
     // Hidden games: every phone gets its own view of the table, never the whole game.
-    on(s, 'lanHiddenStart', (spec) => this.#eachPlayer((user) => ({ t: 'hstart', spec: { ...spec, view: s.game.viewFor(this.#seatOf(user)) } })));
+    on(s, 'lanHiddenStart', (spec) => {
+      this.hiddenSpec = spec;
+      this.#eachPlayer((user) => ({ t: 'hstart', spec: { ...spec, view: s.game.viewFor(this.#seatOf(user)) } }));
+    });
     on(s, 'lanHiddenUpdate', (m) => this.#eachPlayer((user) => ({ t: 'hupdate', ...m, view: s.game.viewFor(this.#seatOf(user)) })));
     on(s, 'gameOver', (o) => { if (s.hidden) this.#broadcast({ t: 'hover', ranking: o.ranking.map((seat) => seat.id), draw: o.draw }); });
-    on(s, 'decision', (p) => p && this.#broadcast({ t: 'decision', ms: p.endsAt - Date.now(), total: p.total, ...(s.hidden ? { decision: p.decision } : {}) }));
-    on(s, 'toast', (text) => this.#broadcast({ t: 'toast', text }));
+    on(s, 'decision', (p) => {
+      this.lastDecision = p;
+      if (p) this.#broadcast({ t: 'decision', ms: p.endsAt - Date.now(), total: p.total, ...(s.hidden ? { decision: p.decision } : {}) });
+    });
+    on(s, 'toast', (text) => { if (!this.quiet) this.#broadcast({ t: 'toast', text }); });
     this.onChange();
     return this.info;
   }
@@ -66,6 +81,8 @@ export class LanHost {
     this.offs = [];
     this.session.lanHost = false;
     for (const p of this.peers.values()) if (p.user) this.session.leave(p.user);
+    for (const a of this.away.values()) { clearTimeout(a.timer); this.session.leave(a.user); }
+    this.away.clear();
     this.peers.clear();
     await this.transport.stopHost();
     this.onChange();
@@ -100,6 +117,7 @@ export class LanHost {
     try { m = JSON.parse(data); } catch { return; }
     const peer = this.peers.get(peerId) ?? { user: null };
     this.peers.set(peerId, peer);
+    if (m.t === 'hello' && this.stream) return this.#streamHello(peerId, peer, m);
     if (m.t === 'hello') {
       if (m.protocol !== PROTOCOL || (this.appVersion && m.version && m.version !== this.appVersion)) {
         this.#send(peerId, { t: 'refuse', reason: `Both phones need the same app version (host: ${this.appVersion ?? '?'}, yours: ${m.version ?? '?'}).` });
@@ -123,10 +141,57 @@ export class LanHost {
     }
   }
 
+  // A viewer's phone in a stream session (identity checked by the session server).
+  #streamHello(peerId, peer, m) {
+    const s = this.session;
+    // Phones update themselves, the streamer's companion app when they click Install: allow
+    // patch releases to differ (x.y.*), the game rules only change in minor releases.
+    if (m.protocol !== PROTOCOL || (this.appVersion && m.version && release(m.version) !== release(this.appVersion))) {
+      this.#send(peerId, { t: 'refuse', reason: `Your app (${m.version ?? '?'}) and the stream (${this.appVersion ?? '?'}) run different versions. The app updates itself — close and reopen it. If that doesn't help, the streamer's companion app needs its update.` });
+      return;
+    }
+    const checked = this.transport.userOf?.(peerId);
+    if (!checked) return this.#send(peerId, { t: 'refuse', reason: 'Not logged in.' });
+    const user = { id: checked.id, login: checked.login, name: checked.name, isBroadcaster: false, isMod: false, phone: true };
+    user.isBroadcaster = !!s.bridge.isStreamer?.(user);
+    // The same viewer again (reconnected, or a second phone): this connection takes over.
+    for (const [id, p] of this.peers) if (id !== peerId && p.user?.id === user.id) this.peers.delete(id);
+    const away = this.away.get(user.id);
+    if (away) { clearTimeout(away.timer); this.away.delete(user.id); }
+    peer.user = user;
+    this.#send(peerId, { t: 'welcome', hostName: this.hostName });
+    this.#send(peerId, this.#state());
+    // Back in a running secret-card game: their own view of the table again.
+    const seat = this.#seatOf(user);
+    if (s.phase === 'playing' && s.hidden && seat !== null && this.hiddenSpec) {
+      this.#send(peerId, { t: 'hstart', spec: { ...this.hiddenSpec, view: s.game.viewFor(seat) } });
+      const d = this.lastDecision;
+      if (d && s.decision) this.#send(peerId, { t: 'decision', ms: d.endsAt - Date.now(), total: d.total, decision: d.decision });
+    }
+    if (!away) {
+      this.quiet = true; // for the stream overlay only, not the phones
+      s.emit('toast', `📱 ${user.name} is here on their phone`);
+      this.quiet = false;
+    }
+    this.onChange();
+  }
+
   #peerLeft(peerId) {
     const p = this.peers.get(peerId);
     this.peers.delete(peerId);
-    if (p?.user) {
+    if (p?.user && this.stream) {
+      // Keep the seat a little while: phones drop when switching networks or locking the screen.
+      const user = p.user;
+      if (this.graceMs > 0 && this.session.seats?.some((x) => x.occupant?.user?.id === user.id)) {
+        const timer = setTimeout(() => {
+          this.away.delete(user.id);
+          this.session.leave(user);
+          this.onChange();
+        }, this.graceMs);
+        timer.unref?.();
+        this.away.set(user.id, { user, timer });
+      }
+    } else if (p?.user) {
       this.session.leave(p.user);
       this.session.emit('toast', `${p.user.name} left`);
     }
@@ -148,8 +213,9 @@ export class LanClient {
     const t = this.transport;
     this.offs.push(t.on('message', ({ data }) => this.#fromHost(data)));
     this.offs.push(t.on('closed', ({ reason } = {}) => this.onChange({ closed: true, reason })));
-    await t.connect(address);
+    const info = await t.connect(address);
     await t.send(JSON.stringify({ t: 'hello', protocol: PROTOCOL, version: this.appVersion, user: { id: this.user.id, name: this.user.name } }));
+    return info;
   }
 
   // A tap on this phone → the host decides.

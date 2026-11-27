@@ -55,6 +55,20 @@ jobs:
           if ($status.version -ne $expected) { throw "exe reports version $($status.version), expected $expected" }
           if ($page -ne 200) { throw "panel returned $page" }
           Write-Host "exe OK: v$($status.version), data folder $($status.dataDir)"
+      - name: Smoke test the session server mode
+        shell: pwsh
+        run: |
+          $exe = Resolve-Path 'dist/StreamBoardGames/StreamBoardGames.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '--session-server','--port','18790' -PassThru -NoNewWindow -RedirectStandardOutput sout.log -RedirectStandardError serr.log
+          $health = $null
+          for ($i = 0; $i -lt 30 -and -not $health; $i++) {
+            Start-Sleep -Seconds 1
+            try { $health = Invoke-RestMethod -Uri 'http://127.0.0.1:18790/health' } catch {}
+          }
+          Get-Process StreamBoardGames -ErrorAction SilentlyContinue | Stop-Process -Force
+          Get-Content sout.log, serr.log -ErrorAction SilentlyContinue
+          if (-not $health.ok) { throw 'session server did not answer on port 18790' }
+          Write-Host "session server OK: v$($health.version)"
       - uses: actions/upload-artifact@v4
         with:
           name: StreamBoardGames-windows
