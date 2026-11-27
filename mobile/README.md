@@ -17,6 +17,29 @@ over an older one. (Builds made before that key existed were signed with a rando
 uninstall that version once.) Before APKs are shared with other people we create a real signing
 key once and keep it as a GitHub secret (losing it means users must uninstall).
 
+## Over-the-air updates
+
+New games and fixes reach the app without a new APK:
+
+1. Every push to `main` publishes the app's files to GitHub Pages under `/app/`
+   (`version.json`, `files.json` with a SHA-256 for every file, and the files themselves).
+2. The app checks that address at start and when you return to game select (at most every
+   30 min). If `package.json`'s **version** there is newer than its own, it downloads every file
+   into its own storage and checks each checksum.
+3. On the game select screen (never mid-game) it switches to the new files and reloads.
+   The header shows the running version ("on this device · v0.13.0").
+
+So phones update when the version is bumped — the same moment the desktop companion gets its
+release.
+
+- **Shell number** (`"shell"` in `mobile/package.json`): raise it whenever the native side
+  changes (a new Capacitor plugin, permissions, `prepare-android.mjs`). Updates built for a newer
+  shell are not applied to older APKs; the app says to install the new APK instead.
+- **Safety:** a downloaded version only becomes permanent once it has started. If it doesn't
+  start, closing and reopening the app brings back the previous version, and that version is not
+  tried again automatically. Installing a new APK always returns to the files inside the APK.
+- **Forks:** point `"updateUrl"` in `mobile/package.json` at your own Pages site.
+
 ## Try it in a browser
 
 `node tools/serve.mjs` in the repo root, then open
@@ -46,5 +69,6 @@ npm run apk              # → android/app/build/outputs/apk/debug/app-debug.apk
   (`renderer/stage.js`). No text fields exist yet — this matters once join codes arrive.
 - Three.js is bundled, so bot games work offline. Trivia Champ uses Open Trivia DB when online
   and its built-in questions otherwise.
-- Not yet: tapping pieces on the board (moves are picked in the side panel), same-WiFi
-  multiplayer, over-the-air game updates, a high-resolution app icon.
+- Tap pieces on the board (pawns, columns, dice, trivia spaces); a Roll button pops up when you
+  can roll.
+- Not yet: same-WiFi multiplayer, a high-resolution app icon.

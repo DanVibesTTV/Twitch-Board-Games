@@ -18,6 +18,7 @@ import { Stage } from './renderer/stage.js';
 import { Sfx } from './renderer/audio.js';
 import { createView } from './renderer/view.js';
 import { Hud, mountDevConsole } from './ui/hud.js';
+import { startAppUpdates } from './ui/app-update.js';
 
 const q = new URLSearchParams(location.search);
 const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
@@ -85,6 +86,16 @@ async function main() {
 
   await bridge.connect();
   if (q.get('game')) session.openLobby(q.get('game'), q.get('mode') || null);
+
+  // Android app only: over-the-air updates of the game files (does nothing in a browser).
+  if (local) {
+    startAppUpdates({
+      session,
+      updateUrl: document.querySelector('meta[name="boardgames-update-url"]')?.content,
+      say: (text) => session.emit('toast', text),
+      onVersion: (v) => bridge.status('connected', `on this device · v${v}`),
+    });
+  }
 
   // handy for debugging from the browser console
   Object.assign(window, { session, bridge, stage });
