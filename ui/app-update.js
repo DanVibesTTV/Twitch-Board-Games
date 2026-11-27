@@ -44,6 +44,19 @@ export function safePath(path) {
     && !p.split('/').some((part) => part === '' || part === '.' || part === '..');
 }
 
+// "…/files/bundles/0.14.0/" → "…/files/bundles/0.14.0" (Android may report folders with a slash at
+// the end; with one, the last path segment would be empty).
+export function trimPath(path) { return String(path ?? '').replace(/\/+$/, ''); }
+
+// The downloaded version a WebView path points at ("0.14.0"), or null for the APK's own files.
+export function bundleOf(path) {
+  const m = /\/bundles\/([^/]+)$/.exec(trimPath(path));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+// Only folders the updater made itself are ever deleted: "0.14.0" or "tmp-0.14.0".
+const OURS = /^(tmp-)?\d+(\.\d+){1,3}$/;
+
 export function toHex(buf) {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
@@ -104,7 +117,8 @@ export function startAppUpdates({ session, say = () => {}, onVersion = () => {},
     current = await fetchJson('./version.json');
     onVersion(current.version);
     const { path } = await WebView.getServerBasePath().catch(() => ({ path: '' }));
-    const fromBundle = String(path ?? '').includes(`/${BUNDLES}/`);
+    const running = bundleOf(path);       // e.g. "0.14.0" when running a download
+    const fromBundle = running !== null || String(path ?? '').includes(`/${BUNDLES}/`);
     if (fromBundle) {
       // A downloaded version that got this far works: keep using it after restarts.
       store.set(OK_KEY, current.version);
@@ -113,7 +127,9 @@ export function startAppUpdates({ session, say = () => {}, onVersion = () => {},
       // Running the files built into the APK: remember which native shell this APK is.
       store.set(SHELL_KEY, current.shell ?? 1);
     }
-    await cleanup(fromBundle ? String(path).split('/').pop() : null);
+    // Running a download whose folder we can't name: delete nothing rather than risk our own files.
+    if (fromBundle && !running) return;
+    await cleanup(running);
   }
 
   // Deletes downloaded bundles except the one in use (and half-finished downloads).
@@ -122,7 +138,7 @@ export function startAppUpdates({ session, say = () => {}, onVersion = () => {},
       const { files } = await Filesystem.readdir({ path: BUNDLES, directory: 'DATA' });
       for (const f of files ?? []) {
         const name = typeof f === 'string' ? f : f.name;
-        if (name !== keep) await Filesystem.rmdir({ path: `${BUNDLES}/${name}`, directory: 'DATA', recursive: true }).catch(() => {});
+        if (name !== keep && OURS.test(name)) await Filesystem.rmdir({ path: `${BUNDLES}/${name}`, directory: 'DATA', recursive: true }).catch(() => {});
       }
     } catch { /* no bundles folder yet */ }
   }
@@ -173,14 +189,14 @@ export function startAppUpdates({ session, say = () => {}, onVersion = () => {},
     await Filesystem.rmdir({ path: final, directory: 'DATA', recursive: true }).catch(() => {});
     await Filesystem.rename({ from: tmp, to: final, directory: 'DATA', toDirectory: 'DATA' });
     const { uri } = await Filesystem.getUri({ path: final, directory: 'DATA' });
-    return decodeURIComponent(uri.replace(/^file:\/\//, ''));
+    return trimPath(decodeURIComponent(uri.replace(/^file:\/\//, '')));
   }
 
   async function apply() {
     if (!readyPath) return;
     say('Installing the update…');
     await new Promise((r) => setTimeout(r, 1200));
-    store.set(TRIED_KEY, readyPath.split('/').pop());
+    store.set(TRIED_KEY, bundleOf(readyPath) ?? '');
     await WebView.setServerBasePath({ path: readyPath }); // reloads the page from the new files
   }
 

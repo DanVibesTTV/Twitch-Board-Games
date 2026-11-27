@@ -1,6 +1,6 @@
 {
   "name": "twitch-boardgames",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "private": true,
   "type": "module",
   "description": "Chat-playable board games for Twitch streams (Three.js overlay + bridges for Lumia Stream, Streamer.bot, anonymous IRC and a local companion app).",

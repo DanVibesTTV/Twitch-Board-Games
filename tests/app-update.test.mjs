@@ -32,7 +32,7 @@ test('toHex / toBase64', () => {
 
 // ── the whole flow against a fake Capacitor ──
 
-function fakeApp({ installed = '0.12.1', remote = '0.13.0', remoteShell = 1, basePath = 'public', storage = new Map(), corrupt = false } = {}) {
+function fakeApp({ installed = '0.12.1', remote = '0.13.0', remoteShell = 1, basePath = 'public', storage = new Map(), corrupt = false, slash = '' } = {}) {
   const files = new Map(); // DATA path → base64
   const calls = [];
   let path = basePath;
@@ -47,10 +47,11 @@ function fakeApp({ installed = '0.12.1', remote = '0.13.0', remoteShell = 1, bas
     async rename({ from, to }) {
       for (const [k, v] of [...files]) if (k.startsWith(`${from}/`)) { files.delete(k); files.set(to + k.slice(from.length), v); }
     },
-    async getUri({ path: p }) { return { uri: `file:///data/user/0/app/files/${p}` }; },
+    // slash: '/' = the phone reports folder paths with a trailing slash
+    async getUri({ path: p }) { return { uri: `file:///data/user/0/app/files/${p}${slash}` }; },
   };
   const WebView = {
-    async getServerBasePath() { return { path }; },
+    async getServerBasePath() { return { path: path === 'public' ? path : `${path.replace(/\/+$/, '')}${slash}` }; },
     async setServerBasePath({ path: p }) { calls.push(['set', p]); path = p; },
     async persistServerBasePath() { calls.push(['persist', path]); },
   };
@@ -158,4 +159,38 @@ test('app update: does nothing outside the app', async () => {
   try {
     assert.equal(startAppUpdates({ session: new Emitter(), updateUrl: 'https://example.test/app/' }), null);
   } finally { globalThis.Capacitor = prev; }
+});
+
+// Bug seen on a real phone (v0.14.0): with a trailing slash in the folder path, the running
+// version deleted its own folder at start. The menu still worked (already loaded), but starting a
+// game failed, and after a restart the app fell back to the APK's version.
+test('app update: a trailing slash in folder paths never deletes the running version', async () => {
+  // 1. download + switch with paths ending in "/"
+  const storage = new Map();
+  const app = fakeApp({ slash: '/', storage });
+  await run(app);
+  assert.equal(app.calls.length, 1);
+  assert.equal(app.calls[0][1], '/data/user/0/app/files/bundles/0.13.0', 'stored without the trailing slash');
+  assert.equal(storage.get('boardgames.app.triedVersion'), '0.13.0');
+  // 2. the new version starts: it must keep its own folder and persist it
+  const files = app.files;
+  const next = fakeApp({ installed: '0.13.0', remote: '0.13.0', basePath: '/data/user/0/app/files/bundles/0.13.0', slash: '/', storage });
+  for (const [k, v] of files) next.files.set(k, v);
+  next.files.set('bundles/0.12.9/index.html', 'old');
+  await run(next);
+  assert.ok(next.files.has('bundles/0.13.0/index.html'), 'the running version keeps its files');
+  assert.ok(!next.files.has('bundles/0.12.9/index.html'), 'older downloads are still removed');
+  assert.deepEqual(next.calls.map((c) => c[0]), ['persist']);
+  assert.equal(storage.get('boardgames.app.okVersion'), '0.13.0');
+});
+
+test('app update: cleanup only ever touches downloaded version folders', async () => {
+  const app = fakeApp({ installed: '0.13.0', remote: '0.13.0', basePath: '/data/user/0/app/files/bundles/0.13.0' });
+  app.files.set('bundles/0.13.0/index.html', 'x');
+  app.files.set('bundles/notes/keep.txt', 'not ours');
+  app.files.set('bundles/tmp-0.14.0/index.html', 'half');
+  await run(app);
+  assert.ok(app.files.has('bundles/0.13.0/index.html'));
+  assert.ok(app.files.has('bundles/notes/keep.txt'));
+  assert.ok(!app.files.has('bundles/tmp-0.14.0/index.html'));
 });
