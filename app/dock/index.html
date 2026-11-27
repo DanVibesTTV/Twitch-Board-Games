@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Stream Board Games · Streamer dock</title>
+  <link rel="icon" href="../panel/icon.png">
+  <link rel="stylesheet" href="dock.css">
+</head>
+<body>
+  <!-- OBS: Docks → Custom Browser Docks → URL http://127.0.0.1:8765/dock/
+       Only you see this page. It shows your own secret cards and the seat controls. -->
+  <header>
+    <span id="conn" class="dot" title="connecting"></span>
+    <b id="title">Board Games</b>
+    <span id="phase" class="pill"></span>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <section id="mine" class="card" hidden>
+    <div class="row-between"><h2 id="mine-title">Your seat</h2><span id="mine-seat" class="muted"></span></div>
+    <div id="private"></div>
+    <div id="turn" class="turn"></div>
+    <div id="moves" class="moves"></div>
+  </section>
+
+  <section id="menu" class="card" hidden>
+    <h2>Pick a game</h2>
+    <div id="games" class="games"></div>
+    <div class="actions"><button data-cmd="!bg vote">Let chat vote</button></div>
+  </section>
+
+  <section id="table" class="card" hidden>
+    <div class="row-between"><h2>Seats</h2><span id="seat-count" class="muted"></span></div>
+    <div id="lobby-tools" class="lobby-tools" hidden>
+      <label id="mode-field" hidden>Mode <select id="mode"></select></label>
+      <label>Bots up to <span class="stepper"><button id="bots-down" aria-label="Fewer bots">−</button><b id="bots">0</b><button id="bots-up" aria-label="More bots">+</button></span></label>
+    </div>
+    <ol id="seats" class="seats"></ol>
+    <div id="entrants" class="muted small" hidden></div>
+    <form id="seat-form" class="seat-form">
+      <select id="seat-pick" aria-label="Seat"></select>
+      <input id="seat-user" placeholder="Twitch username" autocomplete="off" spellcheck="false" maxlength="26">
+      <button type="submit" class="primary">Seat</button>
+    </form>
+  </section>
+
+  <section id="controls" class="card controls" hidden>
+    <button id="join" data-cmd="!join" title="Take a seat yourself (same as typing !join)">Join yourself</button>
+    <button id="start" class="primary" data-cmd="!bg start">Start now</button>
+    <button id="stop" class="danger" data-cmd="!bg stop">Stop game</button>
+    <button id="to-menu" data-cmd="!bg menu">Game select</button>
+  </section>
+
+  <footer>
+    <div id="sent" class="muted small"></div>
+    <div class="muted small">Every button is a chat command, so a chatbot queue (Lumia Stream, Streamer.bot) can do the same: <code>!bg seat 3 username</code>, <code>!bg kick 3</code>.</div>
+  </footer>
+
+  <script type="module" src="dock.js"></script>
+</body>
+</html>

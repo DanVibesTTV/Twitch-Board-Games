@@ -64,6 +64,7 @@ function obsQuery(o) {
 function renderUrl() {
   $('bgcolor-field').hidden = options.bg !== 'color';
   $('obs-url').value = `${location.origin}/?${obsQuery(options)}`;
+  $('dock-url').value = `${location.origin}/dock/`;
   $('preview').href = `${location.origin}/?${obsQuery(options)}&preview=1`;
   $('volume-label').textContent = `${Math.round(options.volume * 100)}%${options.mute ? ' (muted)' : ''}`;
 }

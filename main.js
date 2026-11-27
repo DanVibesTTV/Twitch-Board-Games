@@ -23,6 +23,7 @@ import { Hud, mountDevConsole } from './ui/hud.js';
 import { startAppUpdates } from './ui/app-update.js';
 import { LanUi, savedPlayerName } from './ui/lan-ui.js';
 import { createTransport } from './net/transport.js';
+import { startDockLink } from './ui/dock-link.js';
 
 const q = new URLSearchParams(location.search);
 const num = (k, d) => (q.has(k) ? Number(q.get(k)) : d);
@@ -106,6 +107,8 @@ async function main() {
   // The Session ignores it when it isn't this player's turn.
   if (touch) stage.enableTap((option) => send(`${config.prefix}${option + 1}`));
   if (bridgeKind === 'dev') mountDevConsole(document.body, bridge);
+  // Companion app: the streamer dock (OBS custom browser dock) gets its own private snapshot.
+  if (bridge.pushDock) startDockLink({ session, bridge });
 
   // After the companion app installed an update, reload into the new version once
   // nothing is being played (right away on the game select screen).

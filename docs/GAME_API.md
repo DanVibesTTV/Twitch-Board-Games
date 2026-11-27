@@ -77,7 +77,7 @@ The HUD also receives each move's events (`session.on('gameEvents')`), so games 
 
 ## Hidden information (secret cards)
 
-Set `"hidden": true` in the manifest and add `"privateView"` to `needs` (a screen only one player sees: the phone app today). Then also return `viewFor(seat)` from `createGame`:
+Set `"hidden": true` in the manifest and add `"privateView"` to `needs` (a screen only one player sees: the phone app, or the streamer dock in the companion app — there only the streamer gets one, so chat viewers can't be seated). Then also return `viewFor(seat)` from `createGame`:
 
 ```js
 viewFor(seat)   // what that game seat may see; seat = null → the public view (stream, spectators)
@@ -87,6 +87,7 @@ viewFor(seat)   // what that game seat may see; seat = null → the public view 
 - Over WiFi there is no replay (the RNG state would reveal the deck): the host sends each phone its own view and the public events.
 - **Events and log lines are public.** Never put a hidden card in them. Cards that become public (a showdown) may appear in an event.
 - `game.state` may hold everything (the deck, every hand); it stays on the host.
+- Optional, in the module (`index.js`): `privateSummary(view)` → `{ title, cards: [{ text, red }], board: [...], facts: [[label, value], …] }` for the **streamer dock**, which shows it as the streamer's private panel (Hold 'em: hole cards, board, chips, pot, to call). Without it the dock only shows the move buttons.
 
 Texas Hold 'em (`games/holdem/`) is the reference: `viewFor` replaces other players' cards with `-1` until a showdown. `tests/holdem.test.mjs` and `tests/lan-hidden.test.mjs` check that no view and no WiFi message ever leaks a hidden card.
 

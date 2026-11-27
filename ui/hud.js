@@ -72,6 +72,8 @@ export class Hud {
     session.on('gameEvents', (events) => this.#onGameEvents(events));
     session.on('lobbyInfo', () => this.#renderLobbyInfo());
     bridge.on('status', (st) => { this.status = st; this.#renderHeader(); });
+    // e.g. the streamer dock opened: hidden-information games become playable
+    bridge.on('capabilities', () => { if (this.s.phase === 'menu') this.#renderMenu(this.menuVote); });
 
     this.#phase(session.phase);
   }

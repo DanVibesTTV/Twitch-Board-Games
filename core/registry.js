@@ -14,7 +14,7 @@ const NEEDS = {
 };
 
 // How a missing need is shown ("Needs: …").
-const NEED_LABELS = { privateView: 'private screens (phone app)', hiddenInfo: 'whispers or the Twitch extension' };
+const NEED_LABELS = { privateView: 'a private screen (phone app or streamer dock)', hiddenInfo: 'whispers or the Twitch extension' };
 
 const major = (v) => String(v).split('.')[0];
 
