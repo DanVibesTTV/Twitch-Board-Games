@@ -246,7 +246,7 @@ export class LanUi {
           <h2>Log in with Twitch</h2>
           <p>Open <a href="${esc(verification_uri)}" target="_blank" rel="noopener"><b>twitch.tv/activate</b></a> and enter this code:</p>
           <div class="lan-code">${esc(user_code)}</div>
-          <p class="lan-hint">This phone stays logged in. Waiting for Twitch…</p>
+          <p class="lan-hint"><b>After you tap Authorize, come back to this app</b> (if the Twitch app opens or turns black, switch back via your recent apps). You only do this once.</p>
           <div class="lan-row"><a class="lan-btn" href="${esc(verification_uri)}?device-code=${encodeURIComponent(user_code)}" target="_blank" rel="noopener">Open Twitch</a><button class="lan-btn ghost" data-lan="login-cancel">Cancel</button></div>`);
       }, this.loginSignal);
       return true;
