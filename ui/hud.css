@@ -337,6 +337,7 @@ body.touch #hud [data-lan], body.touch #hud [data-lan] * { pointer-events: auto;
 .lan-hint { font-size: .85em; color: var(--muted); }
 .lan-btn { min-height: 40px; padding: 0 16px !important; border-radius: 12px; background: var(--accent) !important; color: #1d1a26 !important; font-weight: 800; font-size: 15px; cursor: pointer; }
 .lan-btn.ghost { background: rgba(255,255,255,.12) !important; color: var(--text) !important; }
+.lan-name { max-width: 14em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
 .ls-waiting { padding: 14px 16px; border-radius: 14px; background: rgba(255,255,255,.06); color: var(--muted); font-weight: 700; }
 
 /* Pop-up for the name, the join list and messages. Pinned to the top and compact, so a text
