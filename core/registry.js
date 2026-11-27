@@ -7,9 +7,14 @@ import { CORE_VERSION } from './session.js';
 // What each manifest "needs" entry requires from the bridge.
 const NEEDS = {
   hiddenInfo: (caps) => caps.whisper || caps.extension,
+  // A screen only one player sees (phone app, later the streamer's dock), for games with secret cards.
+  privateView: (caps) => caps.privateView,
   sendChat: (caps) => caps.sendChat,
   predictions: (caps) => caps.predictions,
 };
+
+// How a missing need is shown ("Needs: …").
+const NEED_LABELS = { privateView: 'private screens (phone app)', hiddenInfo: 'whispers or the Twitch extension' };
 
 const major = (v) => String(v).split('.')[0];
 
@@ -41,7 +46,7 @@ export function createRegistry(manifests, importer) {
     list: manifests,
     get: (id) => manifests.find((m) => m.id === id) ?? null,
     isPlayable: (m, caps) => (m.needs ?? []).every((n) => NEEDS[n]?.(caps) ?? false),
-    missing: (m, caps) => (m.needs ?? []).filter((n) => !(NEEDS[n]?.(caps) ?? false)),
+    missing: (m, caps) => (m.needs ?? []).filter((n) => !(NEEDS[n]?.(caps) ?? false)).map((n) => NEED_LABELS[n] ?? n),
     load: async (id) => {
       if (!cache.has(id)) cache.set(id, importer(id));
       return cache.get(id);

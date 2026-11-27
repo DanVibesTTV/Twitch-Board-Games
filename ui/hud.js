@@ -327,7 +327,7 @@ export class Hud {
     const who = occupant.type === 'human' ? occupant.user.name : occupant.type === 'crowd' ? 'Chat' : 'Bot';
     const showOptions = d.kind !== 'roll' || occupant.type !== 'bot';
     const tap = this.touch && this.#mine(occupant);
-    const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : 'Tap a numbered piece on the board, or a move below')
+    const hint = tap ? (d.question ? 'Tap your answer on the question card' : d.kind === 'roll' ? 'Tap <b>Roll</b>' : esc(d.hint ?? 'Tap a numbered piece on the board, or a move below'))
       : this.touch && occupant.type === 'human' ? `Waiting for ${esc(who)}…`
       : d.question ? (occupant.type === 'crowd' ? 'Chat votes on the answer — majority wins' : occupant.type === 'bot' ? 'Bot is thinking…' : `${who}, answer with the number on the question card`)
       : occupant.type === 'crowd' ? 'Chat votes — majority wins'

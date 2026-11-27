@@ -6,7 +6,8 @@
 import { Bridge } from './bridge.js';
 
 export class LocalBridge extends Bridge {
-  capabilities = { chat: true, sendChat: false, whisper: false, predictions: false, extension: false, local: true };
+  // privateView: this screen belongs to one player, so it may show their secret cards.
+  capabilities = { chat: true, sendChat: false, whisper: false, predictions: false, extension: false, local: true, privateView: true };
 
   constructor(options = {}) {
     super(options);

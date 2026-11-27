@@ -94,4 +94,7 @@ npm run apk              # → android/app/build/outputs/apk/debug/app-debug.apk
 - Tap pieces on the board (pawns, columns, dice, trivia spaces); a Roll button pops up when you
   can roll.
 - Same-WiFi multiplayer (see above).
+- Texas Hold 'em: secret hole cards — each phone shows only its own cards; over WiFi the host
+  sends every phone its own view (`docs/GAME_API.md`, "Hidden information"). Not available on
+  the stream overlay until there is a private screen for the streamer (the dock, planned).
 - Not yet: QR code to join, a high-resolution app icon.

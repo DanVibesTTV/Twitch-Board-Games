@@ -1,0 +1,59 @@
+{
+  "id": "holdem",
+  "name": "Texas Hold 'em",
+  "tagline": "Poker with secret hole cards. Everyone starts with 1000 play chips, the blinds keep rising, last player with chips wins.",
+  "version": "0.1.0",
+  "coreVersion": "1.0.0",
+  "hidden": true,
+  "players": {
+    "min": 2,
+    "max": 6,
+    "botFillTo": 4
+  },
+  "durationMinutes": [
+    10,
+    25
+  ],
+  "needs": ["privateView"],
+  "thumbnail": "thumbnail.svg",
+  "seats": [
+    { "id": "ruby", "name": "Ruby", "color": "#e5483d" },
+    { "id": "sapphire", "name": "Sapphire", "color": "#3a8ee8" },
+    { "id": "emerald", "name": "Emerald", "color": "#2fbf74" },
+    { "id": "topaz", "name": "Topaz", "color": "#f0b43a" },
+    { "id": "amethyst", "name": "Amethyst", "color": "#a35be0" },
+    { "id": "pearl", "name": "Pearl", "color": "#e8e2d6" }
+  ],
+  "modes": [
+    {
+      "id": "tournament",
+      "name": "Tournament",
+      "description": "1000 chips each, blinds 10/20 doubling every 8 hands.",
+      "rules": { "startChips": 1000, "smallBlind": 10, "blindsEvery": 8 }
+    },
+    {
+      "id": "turbo",
+      "name": "Turbo",
+      "description": "500 chips each, blinds 10/20 doubling every 5 hands.",
+      "rules": { "startChips": 500, "smallBlind": 10, "blindsEvery": 5 }
+    }
+  ],
+  "commands": [
+    { "cmd": "!fold", "help": "give up this hand" },
+    { "cmd": "!check / !call", "help": "check, or match the current bet" },
+    { "cmd": "!raise", "help": "minimum raise (or bet)" },
+    { "cmd": "!pot", "help": "raise half the pot" },
+    { "cmd": "!allin", "help": "push all your chips in" }
+  ],
+  "defaultRules": {
+    "startChips": 1000,
+    "smallBlind": 10,
+    "blindsEvery": 8
+  },
+  "howTo": [
+    "Everyone gets two secret cards. Five shared cards come in three steps: the flop (3), the turn and the river.",
+    "On your turn: fold, check or call, raise, raise half the pot, or go all-in.",
+    "Best five-card hand from your two cards plus the five shared ones wins the pot.",
+    "Play chips only. Blinds double every few hands; the last player with chips wins."
+  ]
+}

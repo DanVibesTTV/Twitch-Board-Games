@@ -12,6 +12,11 @@
 //
 // Only option numbers travel during a game ("seat N chose option K") plus the RNG state, so
 // every copy rolls the same dice even when the host's bots draw random numbers.
+//
+// Hidden-information games (Texas Hold 'em) work differently — replaying would hand every phone
+// the deck. The host sends each phone only its own view:
+//   hstart { spec: { …, view } }   hupdate { view, events, log, seat }   hover { ranking, draw }
+// and decisions carry the decision itself (decision { ms, total, decision }).
 
 const PROTOCOL = 1;
 
@@ -45,7 +50,11 @@ export class LanHost {
     });
     on(s, 'lanStart', (spec) => this.#broadcast({ t: 'start', spec }));
     on(s, 'lanApply', (m) => this.#broadcast({ t: 'apply', ...m }));
-    on(s, 'decision', (p) => p && this.#broadcast({ t: 'decision', ms: p.endsAt - Date.now(), total: p.total }));
+    // Hidden games: every phone gets its own view of the table, never the whole game.
+    on(s, 'lanHiddenStart', (spec) => this.#eachPlayer((user) => ({ t: 'hstart', spec: { ...spec, view: s.game.viewFor(this.#seatOf(user)) } })));
+    on(s, 'lanHiddenUpdate', (m) => this.#eachPlayer((user) => ({ t: 'hupdate', ...m, view: s.game.viewFor(this.#seatOf(user)) })));
+    on(s, 'gameOver', (o) => { if (s.hidden) this.#broadcast({ t: 'hover', ranking: o.ranking.map((seat) => seat.id), draw: o.draw }); });
+    on(s, 'decision', (p) => p && this.#broadcast({ t: 'decision', ms: p.endsAt - Date.now(), total: p.total, ...(s.hidden ? { decision: p.decision } : {}) }));
     on(s, 'toast', (text) => this.#broadcast({ t: 'toast', text }));
     this.onChange();
     return this.info;
@@ -68,6 +77,18 @@ export class LanHost {
   }
 
   #send(peerId, msg) { this.transport.sendTo(peerId, JSON.stringify(msg))?.catch?.(() => {}); }
+
+  // The game seat a joined player plays, or null (watching).
+  #seatOf(user) {
+    const s = this.session;
+    const g = (s.activeSeatIdx ?? []).findIndex((i) => s.seats[i]?.occupant?.user?.id === user.id);
+    return g >= 0 ? g : null;
+  }
+
+  // A message made for each joined player (their own view).
+  #eachPlayer(make) {
+    for (const [peerId, p] of this.peers) if (p.user) this.#send(peerId, make(p.user));
+  }
 
   #broadcast(msg) {
     const text = JSON.stringify(msg);
@@ -188,6 +209,17 @@ export class LanClient {
         break;
       case 'seats':
         if (!this.waiting) s.followSeats(m.seats);
+        break;
+      case 'hstart':
+        this.waiting = false;
+        await s.followHiddenStart(m.spec);
+        this.onChange({ waiting: false });
+        break;
+      case 'hupdate':
+        if (!this.waiting) await s.followHiddenUpdate(m);
+        break;
+      case 'hover':
+        if (!this.waiting) s.followHiddenOver(m);
         break;
     }
   }
