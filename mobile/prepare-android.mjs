@@ -2,6 +2,7 @@
 //   - landscape only (the boards are 16:9) and a resizing window for the on-screen keyboard
 //   - app version from the root package.json (versionCode grows with every release, so a newer
 //     APK installs over an older one)
+//   - test builds signed with the fixed key in mobile/test-signing
 //   - the Stream Board Games icon instead of Capacitor's placeholder
 // Safe to run more than once.
 
@@ -44,6 +45,24 @@ if (/versionCode\s+\d+/.test(gradle) && /versionName\s+"[^"]*"/.test(gradle)) {
   console.warn('[prepare-android] versionCode/versionName not found in app/build.gradle — left unchanged');
 }
 
+// 2b. Test builds are signed with the fixed key in mobile/test-signing (not with a random per-machine
+// debug key), so a new test APK installs over the previous one. Defining signingConfigs.debug
+// replaces the default debug key for the debug build type.
+gradle = await readFile(gradlePath, 'utf8');
+if (!gradle.includes('test-signing/debug.keystore')) {
+  if (!/^android\s*\{/m.test(gradle)) throw new Error('No "android {" block in app/build.gradle');
+  gradle = gradle.replace(/^android\s*\{/m, `android {
+    signingConfigs {
+        debug {
+            storeFile file('../../test-signing/debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }`);
+  await writeFile(gradlePath, gradle);
+}
+
 // 3. Launcher icon: plain PNG icons in every density (the adaptive-icon XML is removed so Android uses them)
 const res = join(app, 'src', 'main', 'res');
 const icon = join(root, 'app', 'panel', 'icon.png');
@@ -53,4 +72,4 @@ for (const dir of await readdir(res)) {
   for (const name of ['ic_launcher.png', 'ic_launcher_round.png']) await copyFile(icon, join(res, dir, name));
 }
 
-console.log(`[prepare-android] landscape, keyboard resize, version ${version} (${versionCode}), icon`);
+console.log(`[prepare-android] landscape, keyboard resize, version ${version} (${versionCode}), test signing key, icon`);
