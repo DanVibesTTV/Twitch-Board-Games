@@ -136,6 +136,8 @@ test('Hold\'em over WiFi: the joined phone never receives the host\'s hole cards
     }
     for (const e of m.events ?? []) if (e.cards) assert.equal(e.type, 'board');
   }
-  assert.equal(guest.phase, 'over');
+  // The host moves on to the menu right after the (very short) winner screen; on a slow
+  // machine the phone may already have followed it there.
+  assert.ok(['over', 'menu'].includes(guest.phase), `guest phase ${guest.phase}`);
   void hostCards;
 });
