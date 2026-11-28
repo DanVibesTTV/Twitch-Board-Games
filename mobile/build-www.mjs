@@ -21,7 +21,14 @@ const threeDir = resolve(process.env.THREE_DIR ?? join(here, 'node_modules', 'th
 // Everything the overlay loads at runtime (keep in sync with .github/workflows/pages.yml).
 const SITE = ['index.html', 'main.js', 'core', 'bridges', 'net', 'renderer', 'ui', 'games', 'sounds'];
 // Only the Three.js files the games import.
-const THREE_FILES = ['build/three.module.js', 'examples/jsm/geometries/RoundedBoxGeometry.js'];
+const THREE_FILES = [
+  'build/three.module.js',
+  'examples/jsm/geometries/RoundedBoxGeometry.js',
+  // Neon Chess loads its 3D models
+  'examples/jsm/loaders/GLTFLoader.js',
+  'examples/jsm/utils/BufferGeometryUtils.js',
+  'examples/jsm/utils/SkeletonUtils.js',
+];
 
 await access(join(threeDir, THREE_FILES[0])).catch(() => {
   throw new Error(`Three.js not found in ${threeDir} — run "npm install" in mobile/ or set THREE_DIR.`);

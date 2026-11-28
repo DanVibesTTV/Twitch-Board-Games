@@ -1,0 +1,114 @@
+{
+  "id": "chess",
+  "name": "Neon Chess",
+  "tagline": "Real chess in a cyberpunk plaza — Overlords, Mechs and Street Runners fight it out on every capture.",
+  "version": "0.1.0",
+  "coreVersion": "1.0.0",
+  "players": {
+    "min": 2,
+    "max": 2,
+    "botFillTo": 2
+  },
+  "durationMinutes": [
+    8,
+    25
+  ],
+  "needs": [],
+  "thumbnail": "thumbnail.svg",
+  "seats": [
+    {
+      "id": "cyan",
+      "name": "Cyan",
+      "color": "#19e6ff"
+    },
+    {
+      "id": "magenta",
+      "name": "Magenta",
+      "color": "#ff2bd6"
+    }
+  ],
+  "modes": [
+    {
+      "id": "blitz",
+      "name": "Blitz",
+      "description": "5 minutes on the clock for each side. Type !join to play — the first two take the seats, a bot fills an empty one.",
+      "rules": {
+        "clockMinutes": 5
+      }
+    },
+    {
+      "id": "streamer",
+      "name": "Duel the Streamer",
+      "description": "The streamer plays Cyan with 5 minutes each. Type !join to enter the draw: one random challenger plays Magenta.",
+      "seats": {
+        "cyan": "host"
+      },
+      "entry": "draw",
+      "rules": {
+        "clockMinutes": 5
+      }
+    },
+    {
+      "id": "rapid",
+      "name": "Rapid",
+      "description": "10 minutes on the clock for each side, for a proper game.",
+      "rules": {
+        "clockMinutes": 10
+      }
+    },
+    {
+      "id": "chat",
+      "name": "Chat vs Streamer",
+      "description": "The streamer plays Cyan, and chat votes on every Magenta move: first the piece, then the square. No clock.",
+      "seats": {
+        "cyan": "host",
+        "magenta": "crowd"
+      },
+      "rules": {
+        "clockMinutes": 0,
+        "moveSeconds": 0
+      }
+    },
+    {
+      "id": "relaxed",
+      "name": "Relaxed",
+      "description": "No clock — 90 seconds per step; if time runs out, the bot makes that move.",
+      "rules": {
+        "clockMinutes": 0,
+        "moveSeconds": 90
+      }
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "!1 … !16",
+      "help": "pick a piece (numbers on the board), then !1 … to pick its square"
+    },
+    {
+      "cmd": "!e4 · !Nf3 · !exd5 · !O-O · !e2e4",
+      "help": "or type the whole move"
+    },
+    {
+      "cmd": "!back",
+      "help": "pick another piece"
+    },
+    {
+      "cmd": "!resign",
+      "help": "give up the game"
+    },
+    {
+      "cmd": "!bg mode <blitz|streamer|rapid|chat|relaxed>",
+      "help": "mods: switch mode in the lobby"
+    }
+  ],
+  "defaultRules": {
+    "clockMinutes": 5,
+    "botLevel": 2
+  },
+  "howTo": [
+    "Normal chess rules. Cyan moves first.",
+    "Pick a piece with its number (!3), then the square it goes to (!7) — or type the move: !e4, !Nf3, !O-O.",
+    "Captures turn into battles: every piece has its own attack.",
+    "Checkmate wins. Watch your clock: out of time loses."
+  ]
+}
