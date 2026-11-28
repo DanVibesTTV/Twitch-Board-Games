@@ -39,7 +39,9 @@ Return an object with:
   decision(),            // what happens next, or null when the game is over:
                          //   { seat, kind, prompt, options: [{ label, alias?, data? }] }
                          //   seat = index into `seats`. Chat picks with !1..!n, or !<alias>.
-  apply(optionIndex),    // perform it → { events: [...], log: ["text", …] }
+  apply(optionIndex, { elapsedMs }),  // perform it → { events: [...], log: ["text", …] }
+                                     // elapsedMs = how long the decision took (for clocks, e.g. chess);
+                                     // the same number reaches joined phones, so keep using it deterministically
   botChoice(),           // index the bot (and AFK fallback) would pick
   ranking(),             // seat indices, winner first
   isDraw(),              // optional: true when the game ended without a winner (prediction gets refunded)

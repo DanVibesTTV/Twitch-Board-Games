@@ -46,12 +46,14 @@ export function createRenderer(stage, { seats }) {
   function setupLights() {
     scene.traverse((o) => { if (o.isLight && !ownLights.includes(o)) { dimmed.push([o, o.intensity]); o.intensity *= 0.3; } });
     const hemi = new THREE.HemisphereLight(0xa0b0ff, 0x1a0c28, 1.7);
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(2, 10, 8);
-    const left = new THREE.DirectionalLight(CYAN, 2.2);
-    left.position.set(-9, 4, 3);
-    const right = new THREE.DirectionalLight(MAGENTA, 2.2);
-    right.position.set(9, 4, 3);
+    const key = new THREE.DirectionalLight(0xffffff, 2.6);
+    key.position.set(1, 9, 10);
+    // The armies face each other: light from the right falls on the Cyan army's faces, so the
+    // cyan light comes from the right and the magenta light from the left.
+    const left = new THREE.DirectionalLight(MAGENTA, 1.5);
+    left.position.set(-9, 3, 4);
+    const right = new THREE.DirectionalLight(CYAN, 1.5);
+    right.position.set(9, 3, 4);
     const back = new THREE.DirectionalLight(0x9c7bff, 0.8);
     back.position.set(0, 5, -10);
     ownLights.push(hemi, key, left, right, back);
@@ -255,10 +257,12 @@ export function createRenderer(stage, { seats }) {
   }
 
   // Battle camera: moves in on the fight, then back to the whole board.
-  async function closeUp(focus, fn) {
+  // span: how far apart the fighters are (squares) — long shots get a wider close-up.
+  async function closeUp(focus, span, fn) {
     const cam = stage.camera;
     const p0 = cam.position.clone(), t0 = stage.target.clone();
-    const p1 = focus.clone().add(p0.clone().sub(t0).multiplyScalar(0.48));
+    const k0 = Math.min(0.85, 0.42 + span * 0.08);
+    const p1 = focus.clone().add(p0.clone().sub(t0).multiplyScalar(k0));
     p1.y = Math.max(p1.y, focus.y + 2.4);
     const look = new THREE.Vector3();
     await stage.animate(500, (k) => { cam.position.lerpVectors(p0, p1, k); look.lerpVectors(t0, focus, k); cam.lookAt(look); });
@@ -271,7 +275,7 @@ export function createRenderer(stage, { seats }) {
   // Battle Chess: every attacker has its own way of taking a piece.
   async function battle(att, victim, toSq) {
     const focus = posOf(att).lerp(posOf(victim), 0.5).add(new THREE.Vector3(0, 0.5, 0));
-    await closeUp(focus, () => fight(att, victim, toSq));
+    await closeUp(focus, posOf(att).distanceTo(posOf(victim)) / S, () => fight(att, victim, toSq));
   }
 
   async function fight(att, victim, toSq) {
@@ -296,7 +300,8 @@ export function createRenderer(stage, { seats }) {
     } else if (att.type === BISHOP) {      // Technomancer: arc lightning from the staff
       await turnTo(att, faceTowards(att, vAt));
       const a = att.group.rotation.y;
-      const staff = posOf(att).add(new THREE.Vector3(Math.cos(a) * 0.25, 1.05, -Math.sin(a) * 0.25));
+      // the staff is in the model's right hand (−x when it faces +z), its crystal at the top
+      const staff = posOf(att).add(new THREE.Vector3(-Math.cos(a) * 0.24, HEIGHT[BISHOP] * 0.95, Math.sin(a) * 0.24));
       sfx('zap');
       pose(att, { armFwdR: 0.9 });
       victim.setFlash(c, 1.2);
