@@ -9,6 +9,7 @@ Chat-playable board games as a stream overlay: a Three.js board with 3D pieces a
 | **Four in a Row** | 2 | Drop discs, line up four. Modes: *Duel the Streamer*, *Viewer Duel*, *Chat vs Streamer*. |
 | **Jazzy Dice** | 2–4 | Five dice, three rolls, one scorecard, in a jazz-lounge look with the dice rolling on a vinyl record. Hold dice, go for JAZZ (five alike). Modes: *Classic* (13 boxes), *Quick* (7 turns), *Chat vs Streamer*. |
 | **Poker Dice** | 2–4 | Bone dice (9, 10, J, Q, K and a skull for A) on a battered pirate table. Up to three rolls for the best poker hand; each round's winner gets a doubloon. Modes: *First to 3*, *Quick* (first to 2), *Chat vs Streamer*. |
+| **Neon Chess** | 2 | Real chess in a cyberpunk plaza: Syndicate Overlords, Cyber-Assassins, Bastion Mechs, Technomancers, Jetpack Soldiers and Street Runners, cyan vs magenta. Every capture is a battle with its own attack and a camera close-up. Modes: *Blitz* (5 min each), *Duel the Streamer*, *Rapid* (10 min), *Chat vs Streamer*, *Relaxed*. |
 | **Trivia Champ** | 2–6 | Trivial Pursuit style on a sci-fi holo-wheel: answer questions from Open Trivia DB, collect category wedges. Modes: *Standard* (4 wedges + final, ~20 min), *Quick* (3 wedges, ~8 min), *Classic* (6 wedges + final, ~40 min). |
 
 ## Use it
@@ -144,6 +145,13 @@ When at least 2 humans play and the connection supports it (Lumia, Streamer.bot,
 - **Round:** every player gets one turn (the starting player rotates). `!roll`, hold with `!1`–`!5` or `!keep 135` like in Jazzy Dice, `!roll` again, and `!stand` when you like your hand (the third roll stands automatically).
 - **Hands, best first:** five of a kind, four of a kind, full house, straight (9–K or 10–A), three of a kind, two pair, one pair, bust. Ties are decided by the higher faces (A is the skull). The best hand of the round wins a doubloon; tied best hands each get one.
 - **Winning:** first to 3 doubloons (2 in *Quick*), as long as nobody else has as many. The ledger on the table shows everyone's hand this round, the hand to beat and the doubloons.
+
+## Neon Chess
+- **Moving:** pick a piece by its number (`!3` — the pieces that can move get numbers on the board), then the square (`!7`), or `!back`. Or type the whole move: `!e4`, `!Nf3`, `!exd5`, `!O-O`, `!e2e4`, `!e7e8q`. Taps on a phone work the same way. `!resign` gives up.
+- **Pieces:** King = Syndicate Overlord (visor laser), Queen = Cyber-Assassin (plasma blades), Rook = Bastion Mech (shoulder cannons), Bishop = Technomancer (arc lightning), Knight = Jetpack Soldier (lands on its target), Pawn = Street Runner. A Runner on the last rank asks which piece it becomes.
+- **Clocks:** *Blitz* and *Duel the Streamer* give each side 5 minutes, *Rapid* 10; running out loses (or draws if the other side can't checkmate any more). *Relaxed* has no clock, 90 seconds per step, and the bot moves for you if time runs out. *Chat vs Streamer* has no clock; chat votes the piece, then the square.
+- **Draws:** stalemate, the same position three times, 50 moves without a capture or Runner move, too few pieces to mate, or 150 moves each.
+- The models are in `games/chess/models/` (made with Modly + UniRig). `python3 tools/optimize-glb.py <file>` shrinks a new model's textures before committing it.
 
 ## Viewer stats
 The game select screen shows a leaderboard. `!bgstats` turns the page: **most wins across all games**, then **longest winning streak**, then **most wins per game** (a game's page appears once it has results). `!bgstats me` posts your own numbers in chat: wins, games played, best streak, current streak and best game.

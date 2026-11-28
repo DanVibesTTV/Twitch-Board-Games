@@ -88,6 +88,7 @@ export class Session extends Emitter {
   #timer = null;
   #reminders = [];
   #token = 0; // invalidates stale timers/votes whenever the decision changes
+  #decisionStartedAt = null; // when the current decision began (chess clocks: apply gets elapsedMs)
 
   // ───────────────────────────── chat ─────────────────────────────
 
@@ -591,6 +592,7 @@ export class Session extends Emitter {
       });
     }
     this.decisionEndsAt = Date.now() + waitMs;
+    this.#decisionStartedAt = Date.now();
     this.emit('decision', {
       decision: d,
       seat,
@@ -651,6 +653,8 @@ export class Session extends Emitter {
 
   async #apply(index) {
     if (this.#busy || this.phase !== 'playing') return;
+    // How long the decision took (chess clocks); sent to joined phones so they apply the same.
+    const elapsedMs = Math.max(0, Date.now() - (this.#decisionStartedAt ?? Date.now()));
     this.#busy = true;
     this.#token++;
     this.#clearTimer();
@@ -661,9 +665,9 @@ export class Session extends Emitter {
     const rngState = this.rng?.getState?.();
     this.#lanRecords = [];
     try {
-      result = this.game.apply(index);
+      result = this.game.apply(index, { elapsedMs });
       if (this.lanHost && this.hidden) this.emit('lanHiddenUpdate', { events: result.events ?? [], log: result.log ?? [], seat: d.seat });
-      else if (this.lanHost) this.emit('lanApply', { index, rngState, records: this.#lanRecords.splice(0) });
+      else if (this.lanHost) this.emit('lanApply', { index, rngState, records: this.#lanRecords.splice(0), elapsedMs });
     } catch (err) {
       // Rejected move: restore the turn so the game never stalls.
       console.error('[session] game.apply failed', err);
@@ -894,7 +898,7 @@ export class Session extends Emitter {
   }
 
   // The host applied option `index`. Throws if this copy of the game has drifted apart.
-  async followApply({ index, rngState, records = [] }) {
+  async followApply({ index, rngState, records = [], elapsedMs = 0 }) {
     if (this.phase !== 'playing' || !this.game) return;
     const d = this.game.decision();
     if (!d) throw new Error('out of sync: no decision here');
@@ -902,7 +906,7 @@ export class Session extends Emitter {
     this.#lanRecords.push(...records);
     this.decision = null;
     this.emit('decision', null);
-    const result = this.game.apply(index);
+    const result = this.game.apply(index, { elapsedMs });
     const seat = this.seats[this.activeSeatIdx[d.seat]];
     for (const line of result.log ?? []) this.emit('log', { seat, text: line });
     this.#busy = true;
